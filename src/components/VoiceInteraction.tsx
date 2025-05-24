@@ -1,11 +1,10 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, MessageCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { speakTextWithFallback, startSpeechRecognitionWithFallback, isWebView } from '@/utils/audioFallback';
+import { speakTextWithFallback, startSpeechRecognitionWithFallback, isWebView, enableAutoplay } from '@/utils/audioFallback';
 
 interface Message {
   id: string;
@@ -49,6 +48,16 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
     console.log('Generated session ID:', newSessionId);
+  }, []);
+
+  // Initialize autoplay and audio context on component mount
+  useEffect(() => {
+    const initializeAudio = async () => {
+      await enableAutoplay();
+      console.log('Audio initialization completed');
+    };
+    
+    initializeAudio();
   }, []);
 
   const initializeSpeechRecognition = useCallback(async () => {

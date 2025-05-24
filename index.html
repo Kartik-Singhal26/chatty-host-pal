@@ -8,6 +8,10 @@
     <meta name="description" content="Advanced AI voice assistant powered by Armstrong Dematic's intelligent automation solutions" />
     <meta name="author" content="Armstrong Dematic" />
 
+    <!-- Autoplay and media permissions -->
+    <meta http-equiv="Permissions-Policy" content="autoplay=*, microphone=*, camera=*, display-capture=*" />
+    <meta http-equiv="Feature-Policy" content="autoplay 'self'; microphone 'self'; camera 'self'" />
+    
     <meta property="og:title" content="Astrova.ai - Armstrong Dematic AI Voice Assistant" />
     <meta property="og:description" content="Advanced AI voice assistant powered by Armstrong Dematic's intelligent automation solutions" />
     <meta property="og:type" content="website" />
@@ -23,5 +27,29 @@
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Initialize audio context on page load -->
+    <script>
+      // Unlock audio context on first user interaction
+      function unlockAudio() {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            console.log('Audio context resumed successfully');
+          });
+        }
+        // Remove event listeners after first unlock
+        document.removeEventListener('touchstart', unlockAudio, true);
+        document.removeEventListener('touchend', unlockAudio, true);
+        document.removeEventListener('mousedown', unlockAudio, true);
+        document.removeEventListener('keydown', unlockAudio, true);
+      }
+      
+      // Add event listeners for user interaction
+      document.addEventListener('touchstart', unlockAudio, true);
+      document.addEventListener('touchend', unlockAudio, true);
+      document.addEventListener('mousedown', unlockAudio, true);
+      document.addEventListener('keydown', unlockAudio, true);
+    </script>
   </body>
 </html>

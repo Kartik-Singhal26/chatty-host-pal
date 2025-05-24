@@ -1,3 +1,4 @@
+
 // Utility to detect if we're running in a WebView/native app
 export const isWebView = (): boolean => {
   const userAgent = navigator.userAgent;
@@ -9,38 +10,85 @@ export const isWebView = (): boolean => {
   );
 };
 
-// Enhanced speech synthesis with fallback for native apps
+// Enable autoplay and prepare audio context
+export const enableAutoplay = async (): Promise<void> => {
+  try {
+    // Create and resume audio context to enable autoplay
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    
+    // Pre-create a silent audio to unlock autoplay
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.1);
+    
+    console.log('Audio context unlocked for autoplay');
+  } catch (error) {
+    console.log('Audio context unlock failed:', error);
+  }
+};
+
+// Enhanced speech synthesis with autoplay support
 export const speakTextWithFallback = async (text: string): Promise<boolean> => {
+  // Enable autoplay if possible
+  await enableAutoplay();
+
   // First try the Web Speech API
-  if ('speechSynthesis' in window && !isWebView()) {
+  if ('speechSynthesis' in window) {
     try {
+      // Cancel any ongoing speech
+      speechSynthesis.cancel();
+      
       return new Promise((resolve) => {
         const utterance = new SpeechSynthesisUtterance(text);
         
-        const voices = speechSynthesis.getVoices();
-        const femaleVoice = voices.find(voice => 
-          voice.name.toLowerCase().includes('female') || 
-          voice.name.toLowerCase().includes('woman') ||
-          voice.name.toLowerCase().includes('zira') ||
-          voice.name.toLowerCase().includes('eva') ||
-          voice.name.toLowerCase().includes('samantha')
-        );
-        
-        if (femaleVoice) {
-          utterance.voice = femaleVoice;
+        // Wait for voices to load
+        const speakWithVoice = () => {
+          const voices = speechSynthesis.getVoices();
+          const femaleVoice = voices.find(voice => 
+            voice.name.toLowerCase().includes('female') || 
+            voice.name.toLowerCase().includes('woman') ||
+            voice.name.toLowerCase().includes('zira') ||
+            voice.name.toLowerCase().includes('eva') ||
+            voice.name.toLowerCase().includes('samantha') ||
+            voice.name.toLowerCase().includes('alloy')
+          );
+          
+          if (femaleVoice) {
+            utterance.voice = femaleVoice;
+          }
+          
+          utterance.rate = 0.9;
+          utterance.pitch = 1.1;
+          utterance.volume = 0.9;
+          
+          utterance.onend = () => resolve(true);
+          utterance.onerror = (error) => {
+            console.error('Speech synthesis error:', error);
+            resolve(false);
+          };
+          
+          // Force speech to start immediately
+          speechSynthesis.speak(utterance);
+        };
+
+        if (speechSynthesis.getVoices().length === 0) {
+          speechSynthesis.onvoiceschanged = speakWithVoice;
+        } else {
+          speakWithVoice();
         }
-        
-        utterance.rate = 0.9;
-        utterance.pitch = 1.1;
-        utterance.volume = 0.9;
-        
-        utterance.onend = () => resolve(true);
-        utterance.onerror = () => resolve(false);
-        
-        speechSynthesis.speak(utterance);
       });
     } catch (error) {
-      console.log('Web Speech API failed, trying fallback');
+      console.log('Web Speech API failed, trying fallback:', error);
     }
   }
 
