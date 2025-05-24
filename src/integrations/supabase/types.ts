@@ -9,13 +9,108 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      chat_sessions: {
+        Row: {
+          created_at: string
+          guest_preferences: Json | null
+          id: string
+          interaction_count: number | null
+          last_activity: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          guest_preferences?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_activity?: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          guest_preferences?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_activity?: string
+          session_id?: string
+        }
+        Relationships: []
+      }
+      knowledge_base: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          prompt_key: string
+          prompt_text: string
+          response_template: string | null
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          prompt_key: string
+          prompt_text: string
+          response_template?: string | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          prompt_key?: string
+          prompt_text?: string
+          response_template?: string | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: []
+      }
+      user_interactions: {
+        Row: {
+          ai_response: string
+          id: string
+          interaction_timestamp: string
+          knowledge_used: string[] | null
+          response_rating: number | null
+          response_time_ms: number | null
+          session_id: string
+          user_input: string
+        }
+        Insert: {
+          ai_response: string
+          id?: string
+          interaction_timestamp?: string
+          knowledge_used?: string[] | null
+          response_rating?: number | null
+          response_time_ms?: number | null
+          session_id: string
+          user_input: string
+        }
+        Update: {
+          ai_response?: string
+          id?: string
+          interaction_timestamp?: string
+          knowledge_used?: string[] | null
+          response_rating?: number | null
+          response_time_ms?: number | null
+          session_id?: string
+          user_input?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_knowledge_usage: {
+        Args: { prompt_keys: string[] }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

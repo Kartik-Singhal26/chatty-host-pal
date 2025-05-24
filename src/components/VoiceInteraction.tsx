@@ -1,6 +1,5 @@
-
-import React, { useState, useRef, useCallback } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Phone, Coffee, Bed } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Phone, Coffee, Bed, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +10,7 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  knowledgeUsed?: number;
 }
 
 interface VoiceInteractionProps {
@@ -21,10 +21,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Welcome to our hospitality assistant! I can help you with room service, amenities, local recommendations, and more. How may I assist you today?",
+      text: "Good day! I'm Elena, your personal hospitality assistant. I'm here to ensure your stay is absolutely perfect. Whether you need dining recommendations, local insights, or assistance with our amenities, I'm delighted to help. How may I be of service today?",
       isUser: false,
       timestamp: new Date()
     }
@@ -33,6 +34,13 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const recognition = useRef<SpeechRecognition | null>(null);
   const synthesis = useRef<SpeechSynthesis>(window.speechSynthesis);
   const { toast } = useToast();
+
+  // Generate unique session ID on component mount
+  useEffect(() => {
+    const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setSessionId(newSessionId);
+    console.log('Generated session ID:', newSessionId);
+  }, []);
 
   const initializeSpeechRecognition = useCallback(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -81,11 +89,14 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   const processWithChatGPT = async (userInput: string) => {
     setIsProcessing(true);
-    console.log('Processing with ChatGPT-4o:', userInput);
+    console.log('Processing with ChatGPT-4o:', userInput, 'Session:', sessionId);
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
-        body: { userInput }
+        body: { 
+          userInput,
+          sessionId 
+        }
       });
 
       if (error) {
@@ -93,12 +104,14 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       }
 
       const assistantResponse = data.response;
+      const knowledgeUsed = data.knowledgeUsed || 0;
 
       const assistantMessage: Message = {
         id: Date.now().toString(),
         text: assistantResponse,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        knowledgeUsed
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -107,7 +120,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         onResponseGenerated(assistantResponse);
       }
 
-      // Speak the response
+      // Speak the response with professional female voice
       speakText(assistantResponse);
 
     } catch (error) {
@@ -128,18 +141,34 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       synthesis.current.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 0.8;
+      
+      // Enhanced voice settings for professional female voice
+      const voices = synthesis.current.getVoices();
+      const femaleVoice = voices.find(voice => 
+        voice.name.toLowerCase().includes('female') || 
+        voice.name.toLowerCase().includes('woman') ||
+        voice.name.toLowerCase().includes('zira') ||
+        voice.name.toLowerCase().includes('eva') ||
+        voice.name.toLowerCase().includes('samantha')
+      );
+      
+      if (femaleVoice) {
+        utterance.voice = femaleVoice;
+      }
+      
+      // Professional voice settings
+      utterance.rate = 0.85; // Slightly slower for elegance
+      utterance.pitch = 1.1; // Slightly higher pitch
+      utterance.volume = 0.9; // Clear volume
       
       utterance.onstart = () => {
         setIsSpeaking(true);
-        console.log('Started speaking');
+        console.log('Elena started speaking');
       };
       
       utterance.onend = () => {
         setIsSpeaking(false);
-        console.log('Finished speaking');
+        console.log('Elena finished speaking');
       };
       
       utterance.onerror = (event) => {
@@ -190,7 +219,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         <CardHeader>
           <CardTitle className="text-center text-blue-800 flex items-center justify-center gap-2">
             <Phone className="h-6 w-6" />
-            Hospitality Voice Assistant
+            Elena - Your Hospitality Assistant
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center space-y-4">
@@ -228,11 +257,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
           </div>
 
           <div className="text-sm text-gray-600">
-            {isListening && <p className="text-blue-600 font-medium animate-pulse">🎤 Listening...</p>}
-            {isProcessing && <p className="text-amber-600 font-medium">🧠 Processing with ChatGPT-4o...</p>}
-            {isSpeaking && <p className="text-green-600 font-medium">🔊 Speaking response...</p>}
+            {isListening && <p className="text-blue-600 font-medium animate-pulse">🎤 Elena is listening...</p>}
+            {isProcessing && <p className="text-amber-600 font-medium">🧠 Elena is thinking...</p>}
+            {isSpeaking && <p className="text-green-600 font-medium">🔊 Elena is speaking...</p>}
             {!isListening && !isProcessing && !isSpeaking && (
-              <p className="text-gray-500">Click the microphone to start voice interaction</p>
+              <p className="text-gray-500">Click the microphone to speak with Elena</p>
             )}
           </div>
         </CardContent>
@@ -268,7 +297,14 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       {/* Conversation Display */}
       <Card className="border-gray-200">
         <CardHeader>
-          <CardTitle className="text-gray-800">Conversation History</CardTitle>
+          <CardTitle className="text-gray-800 flex items-center gap-2">
+            Conversation with Elena
+            {sessionId && (
+              <span className="text-xs text-gray-500 font-normal">
+                Session: {sessionId.slice(-8)}
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4 max-h-96 overflow-y-auto">
@@ -285,9 +321,17 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
                   }`}
                 >
                   <p className="text-sm">{message.text}</p>
-                  <p className="text-xs opacity-70 mt-1">
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-xs opacity-70">
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                    {message.knowledgeUsed !== undefined && message.knowledgeUsed > 0 && (
+                      <div className="flex items-center gap-1 text-xs opacity-70">
+                        <Brain className="h-3 w-3" />
+                        <span>{message.knowledgeUsed}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
