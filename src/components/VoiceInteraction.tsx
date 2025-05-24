@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, AlertCircle, Languages } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, AlertCircle, Languages, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -8,9 +8,11 @@ import {
   speakTextWithFallback, 
   startSpeechRecognitionWithFallback, 
   isWebView, 
+  isAndroid,
   enableAutoplay, 
   detectLanguageFromSpeech,
-  getBrowserPreferredIndianLanguage
+  getBrowserPreferredIndianLanguage,
+  setupAndroidInterface
 } from '@/utils/audioFallback';
 import { SUPPORTED_LANGUAGES, Language, getLanguageByCode } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -34,8 +36,10 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isWebViewDetected, setIsWebViewDetected] = useState(false);
+  const [isAndroidDetected, setIsAndroidDetected] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
   const [autoLanguageDetection, setAutoLanguageDetection] = useState(true);
+  const [showSetupInstructions, setShowSetupInstructions] = useState(false);
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const { toast } = useToast();
@@ -46,9 +50,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
     
-    // Detect WebView
+    // Detect environment
     const webViewDetected = isWebView();
+    const androidDetected = isAndroid();
     setIsWebViewDetected(webViewDetected);
+    setIsAndroidDetected(androidDetected);
     
     // Set default language based on browser preference
     const preferredLangCode = getBrowserPreferredIndianLanguage();
@@ -60,15 +66,25 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     // Initialize audio
     enableAutoplay();
     
-    if (webViewDetected) {
+    // Show appropriate warnings/instructions
+    if (webViewDetected && androidDetected) {
+      setupAndroidInterface();
       toast({
-        title: "नेटिव ऐप डिटेक्ट हुआ / Native App Detected",
-        description: "वॉइस फीचर्स के लिए नेटिव इम्प्लीमेंटेशन की आवश्यकता हो सकती है / Voice features may require native implementation",
+        title: "एंड्रॉयड नेटिव ऐप डिटेक्ट / Android Native App Detected",
+        description: "बेहतर ऑडियो के लिए नेटिव इंटीग्रेशन की आवश्यकता / Native integration required for better audio",
         variant: "default",
       });
+      
+      // Show setup instructions after a delay
+      setTimeout(() => setShowSetupInstructions(true), 3000);
     }
     
-    console.log('VoiceInteraction initialized:', { sessionId: newSessionId, language: preferredLanguage?.name, isWebView: webViewDetected });
+    console.log('VoiceInteraction initialized:', { 
+      sessionId: newSessionId, 
+      language: preferredLanguage?.name, 
+      isWebView: webViewDetected, 
+      isAndroid: androidDetected 
+    });
   }, [toast]);
 
   const initializeSpeechRecognition = useCallback(async () => {
@@ -210,18 +226,18 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       const speechCode = `${languageCode}-IN`;
       const success = await speakTextWithFallback(text, speechCode);
       
-      if (!success && isWebViewDetected) {
+      if (!success && (isWebViewDetected || isAndroidDetected)) {
         toast({
-          title: "वॉइस आउटपुट / Voice Output",
-          description: "नेटिव स्पीच के लिए तैयार / Ready for native speech synthesis",
+          title: "ऑडियो आउटपुट / Audio Output",
+          description: "नेटिव इंटीग्रेशन से बेहतर परिणाम मिलेंगे / Better results with native integration",
           variant: "default",
         });
       }
     } catch (error) {
       console.error('Speech synthesis error:', error);
       toast({
-        title: "स्पीच एरर / Speech Error",
-        description: "बोलने में समस्या / Problem with speech output",
+        title: "ऑडियो एरर / Audio Error",
+        description: "आवाज में समस्या, कृपया नेटिव सेटअप चेक करें / Audio issue, please check native setup",
         variant: "destructive",
       });
     } finally {
@@ -291,11 +307,56 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         </Button>
       </div>
 
-      {/* WebView Warning */}
-      {isWebViewDetected && (
+      {/* Android Setup Warning */}
+      {isWebViewDetected && isAndroidDetected && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-orange-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-orange-800">
+                <AlertCircle className="h-4 w-4" />
+                <div>
+                  <p className="text-sm font-medium">
+                    एंड्रॉयड APK में चल रहा है / Running in Android APK
+                  </p>
+                  <p className="text-xs text-orange-600">
+                    ऑडियो के लिए नेटिव इंटीग्रेशन आवश्यक / Native integration required for audio
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSetupInstructions(!showSetupInstructions)}
+                className="gap-2"
+              >
+                <Settings className="h-3 w-3" />
+                सेटअप / Setup
+              </Button>
+            </div>
+            
+            {showSetupInstructions && (
+              <div className="mt-4 p-3 bg-white rounded text-xs">
+                <h4 className="font-medium text-gray-800 mb-2">Android Integration Setup:</h4>
+                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                  <li>Add JavaScript interface: <code className="bg-gray-100 px-1">webView.addJavascriptInterface(new AndroidTTSInterface(this), "Android")</code></li>
+                  <li>Implement TTS interface with <code className="bg-gray-100 px-1">speak(text, language)</code> method</li>
+                  <li>Add RECORD_AUDIO permission to AndroidManifest.xml</li>
+                  <li>Initialize TextToSpeech in your Activity</li>
+                </ol>
+                <p className="mt-2 text-orange-600">
+                  चेक कंसोल लॉग्स फॉर डिटेल्ड इंस्ट्रक्शन्स / Check console logs for detailed instructions
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* WebView Warning for non-Android */}
+      {isWebViewDetected && !isAndroidDetected && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-blue-800">
               <AlertCircle className="h-4 w-4" />
               <p className="text-sm">
                 नेटिव ऐप मोड में चल रहा है / Running in native app mode. 
