@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,9 @@ import {
   detectLanguageFromSpeech,
   getBrowserPreferredIndianLanguage
 } from '@/utils/audioFallback';
-import { SUPPORTED_LANGUAGES, Language, getLanguageByCode } from '@/utils/languageConfig';
+import { SUPPORTED_LANGUAGES, Language, getLanguageByCode, VoiceGender } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
+import VoiceGenderSelector from '@/components/VoiceGenderSelector';
 
 interface Message {
   id: string;
@@ -34,6 +34,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
+  const [selectedGender, setSelectedGender] = useState<VoiceGender>('female');
   const [autoLanguageDetection, setAutoLanguageDetection] = useState(true);
   
   const recognition = useRef<SpeechRecognition | null>(null);
@@ -194,11 +195,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const speakText = async (text: string, languageCode: string = selectedLanguage.code) => {
     setIsSpeaking(true);
     const language = getLanguageByCode(languageCode) || selectedLanguage;
-    console.log(`AI started speaking in ${language.nativeName}`);
+    console.log(`AI started speaking in ${language.nativeName} with ${selectedGender} voice`);
     
     try {
       const speechCode = `${languageCode}-IN`;
-      await speakTextWithFallback(text, speechCode);
+      await speakTextWithFallback(text, speechCode, selectedGender);
     } catch (error) {
       console.error('Speech synthesis error:', error);
     } finally {
@@ -247,13 +248,28 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     console.log(`Language changed to: ${language.nativeName}`);
   }, []);
 
+  const handleGenderChange = useCallback((gender: VoiceGender) => {
+    setSelectedGender(gender);
+    console.log(`Voice gender changed to: ${gender}`);
+    
+    toast({
+      title: "Voice Updated",
+      description: `Switched to ${gender} voice`,
+      variant: "default",
+    });
+  }, [toast]);
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
-      {/* Language Selector with Auto-Detection Toggle */}
-      <div className="flex justify-center items-center gap-4">
+      {/* Language and Gender Selectors */}
+      <div className="flex justify-center items-center gap-4 flex-wrap">
         <LanguageSelector
           selectedLanguage={selectedLanguage}
           onLanguageChange={handleLanguageChange}
+        />
+        <VoiceGenderSelector
+          selectedGender={selectedGender}
+          onGenderChange={handleGenderChange}
         />
         <Button
           variant={autoLanguageDetection ? "default" : "outline"}
@@ -315,12 +331,12 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
             )}
             {isSpeaking && (
               <p className="text-black font-medium">
-                Speaking in {selectedLanguage.name}...
+                Speaking in {selectedLanguage.name} ({selectedGender} voice)...
               </p>
             )}
             {!isListening && !isProcessing && !isSpeaking && (
               <p className="text-gray-500">
-                Click to start voice interaction in {selectedLanguage.name}
+                Click to start voice interaction in {selectedLanguage.name} with {selectedGender} voice
               </p>
             )}
           </div>

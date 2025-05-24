@@ -7,6 +7,8 @@ export interface Language {
   nativeName: string;
 }
 
+export type VoiceGender = 'female' | 'male';
+
 export const SUPPORTED_LANGUAGES: Language[] = [
   { code: 'hi', name: 'Hindi', speechCode: 'hi-IN', flag: '🇮🇳', nativeName: 'हिन्दी' },
   { code: 'bn', name: 'Bengali', speechCode: 'bn-IN', flag: '🇮🇳', nativeName: 'বাংলা' },
@@ -29,7 +31,7 @@ export const getLanguageByCode = (code: string): Language | undefined => {
   return SUPPORTED_LANGUAGES.find(lang => lang.code === code);
 };
 
-export const getPreferredVoice = (voices: SpeechSynthesisVoice[], languageCode: string): SpeechSynthesisVoice | null => {
+export const getPreferredVoice = (voices: SpeechSynthesisVoice[], languageCode: string, preferredGender: VoiceGender = 'female'): SpeechSynthesisVoice | null => {
   // Try to find a voice that matches the language
   const languageVoices = voices.filter(voice => voice.lang.startsWith(languageCode));
   
@@ -44,16 +46,33 @@ export const getPreferredVoice = (voices: SpeechSynthesisVoice[], languageCode: 
   
   if (indianVoice) return indianVoice;
   
-  // Prefer female voices
-  const femaleVoice = languageVoices.find(voice => 
-    voice.name.toLowerCase().includes('female') || 
-    voice.name.toLowerCase().includes('woman') ||
-    voice.name.toLowerCase().includes('priya') ||
-    voice.name.toLowerCase().includes('aditi') ||
-    voice.name.toLowerCase().includes('raveena')
-  );
-  
-  if (femaleVoice) return femaleVoice;
+  // Gender-based voice selection
+  if (preferredGender === 'female') {
+    const femaleVoice = languageVoices.find(voice => 
+      voice.name.toLowerCase().includes('female') || 
+      voice.name.toLowerCase().includes('woman') ||
+      voice.name.toLowerCase().includes('priya') ||
+      voice.name.toLowerCase().includes('aditi') ||
+      voice.name.toLowerCase().includes('raveena') ||
+      voice.name.toLowerCase().includes('aria') ||
+      voice.name.toLowerCase().includes('sarah') ||
+      voice.name.toLowerCase().includes('alice')
+    );
+    
+    if (femaleVoice) return femaleVoice;
+  } else {
+    const maleVoice = languageVoices.find(voice => 
+      voice.name.toLowerCase().includes('male') || 
+      voice.name.toLowerCase().includes('man') ||
+      voice.name.toLowerCase().includes('amit') ||
+      voice.name.toLowerCase().includes('ravi') ||
+      voice.name.toLowerCase().includes('david') ||
+      voice.name.toLowerCase().includes('alex') ||
+      voice.name.toLowerCase().includes('brian')
+    );
+    
+    if (maleVoice) return maleVoice;
+  }
   
   // Return the first available voice for the language
   return languageVoices[0];

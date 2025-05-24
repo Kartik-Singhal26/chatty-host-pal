@@ -1,4 +1,3 @@
-
 import { getPreferredVoice } from './languageConfig';
 
 // Enhanced WebView detection for various native app contexts
@@ -113,12 +112,12 @@ const callAndroidTTS = (text: string, languageCode: string): boolean => {
   }
 };
 
-// Enhanced speech synthesis with comprehensive native app support
-export const speakTextWithFallback = async (text: string, languageCode: string = 'hi-IN'): Promise<boolean> => {
+// Enhanced speech synthesis with gender preference support
+export const speakTextWithFallback = async (text: string, languageCode: string = 'hi-IN', preferredGender: 'female' | 'male' = 'female'): Promise<boolean> => {
   // Enable autoplay capabilities
   await enableAutoplay();
 
-  console.log(`Attempting to speak: "${text}" in language: ${languageCode}`);
+  console.log(`Attempting to speak: "${text}" in language: ${languageCode} with ${preferredGender} voice`);
 
   // Primary: Try native Android TTS for WebView/APK
   if (isWebView() || isAndroid()) {
@@ -141,12 +140,12 @@ export const speakTextWithFallback = async (text: string, languageCode: string =
           const voices = speechSynthesis.getVoices();
           console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
           
-          const preferredVoice = getPreferredVoice(voices, languageCode);
+          const preferredVoice = getPreferredVoice(voices, languageCode, preferredGender);
           
           if (preferredVoice) {
             utterance.voice = preferredVoice;
             utterance.lang = preferredVoice.lang;
-            console.log('Selected voice:', preferredVoice.name, preferredVoice.lang);
+            console.log('Selected voice:', preferredVoice.name, preferredVoice.lang, `(${preferredGender})`);
           } else {
             utterance.lang = languageCode;
             console.log('Using default voice for language:', languageCode);
@@ -347,8 +346,8 @@ export const detectLanguageFromSpeech = (transcript: string): string => {
     'mr': /\b(नमस्कार|नमस्ते|धन्यवाद|कृपया|होय|नाही|चांगले|कसे|आहात|मी|तुम्ही|हे|ते|आज|उद्या|सुप्रभात|जय|महाराष्ट्र)\b/i,
     'ta': /\b(வணக்கம்|நமஸ்கார|நன்றி|தயவுசெய்து|ஆம்|இல்லை|நல்லது|எப்படி|இருக்கீங்க|நான்|நீங்க|இது|அது|இன்று|நாளை|காலை|வணக்கம்|வாழ்த்து)\b/i,
     'gu': /\b(નમસ્તે|નમસ્કાર|આભાર|કૃપા|કરીને|હા|ના|સારું|કેમ|છો|હું|તમે|આ|તે|આજે|કાલે|સુપ્રભાત|જય|ગુજરાત)\b/i,
-    'kn': /\b(ನಮಸ್ಕಾರ|ನಮಸ್ತೆ|ಧನ್ಯವಾದಗಳು|ದಯವಿಟ್ಟು|ಹೌದು|ಇಲ್ಲ|ಒಳ್ಳೆಯದು|ಹೇಗೆ|ಇದ್ದೀರಿ|ನಾನು|ನೀವು|ಇದು|ಅದು|ಇಂದು|ನಾಳೆ|ಸುಪ್ರಭಾತ|ಜೈ)\b/i,
-    'ml': /\b(നമസ്കാരം|നമസ്തെ|നന്ദി|ദയവായി|അതെ|ഇല്ല|നല്ലത്|എങ്ങനെ|ഉണ്ട്|ഞാൻ|നിങ്ങൾ|ഇത്|അത്|ഇന്ന്|നാളെ|ସുപ്രഭാತം|ജയ്)\b/i,
+    'kn': /\b(ನಮಸ್ಕಾರ|ನಮಸ್ತೆ|ಧನ್ಯವಾದಗಳು|ದಯವಿಟ್ಟು|ಹೌದು|ಇಲ್ಲ|ಒಳ್ಳೆಯದು|ಹೇಗೆ|ಇದ್ddೀರಿ|ನಾನು|ನೀವು|ಇದು|ಅದು|ಇಂದು|ನಾಳೆ|ಸುಪ್ರಭಾತ|ಜೈ)\b/i,
+    'ml': /\b(നമസ്കാരം|നമസ്തെ|നന്ദി|ദയവായി|അതെ|ഇല്ല|നല്ലത്|എങ്ങനെ|ഉണ്ട്|ഞാൻ|നിങ്ങൾ|ഇത്|അത്|ഇന്ന്|നാളെ|ସുപ്രഭാതം|ജയ്)\b/i,
     'pa': /\b(ਸਤ|ਸ੍ਰੀ|ਅਕਾਲ|ਨਮਸਕਾਰ|ਧੰਨਵਾਦ|ਕਿਰਪਾ|ਕਰਕੇ|ਹਾਂ|ਨਹੀਂ|ਚੰਗਾ|ਕਿਵੇਂ|ਹੋ|ਮੈਂ|ਤੁਸੀਂ|ਇਹ|ਉਹ|ਅੱਜ|ਕੱਲ|ਸ਼ੁਭ|ਸਵੇਰ)\b/i,
     'or': /\b(ନମସ୍କାର|ନମସ୍ତେ|ଧନ୍ୟବାଦ|ଦୟାକରି|ହଁ|ନାହିଁ|ଭଲ|କେମିତି|ଅଛନ୍ତି|ମୁଁ|ଆପଣ|ଏହା|ସେହା|ଆଜି|କାଲି|ସୁପ୍ରଭାତ|ଜୟ)\b/i,
     'as': /\b(নমস্কাৰ|নমস্তে|ধন্যবাদ|অনুগ্ৰহ|কৰি|হয়|নহয়|ভাল|কেনে|আছে|মই|আপুনি|এই|সেই|আজি|কালি|শুভ|ৰাতিপুৱা)\b/i,
