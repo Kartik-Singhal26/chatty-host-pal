@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { speakTextWithFallback, startSpeechRecognitionWithFallback, isWebView } from '@/utils/audioFallback';
 
 interface Message {
   id: string;
@@ -23,10 +24,25 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isWebViewDetected, setIsWebViewDetected] = useState(false);
   
   const recognition = useRef<SpeechRecognition | null>(null);
-  const synthesis = useRef<SpeechSynthesis>(window.speechSynthesis);
   const { toast } = useToast();
+
+  // Check if running in WebView and show appropriate warnings
+  useEffect(() => {
+    const webViewDetected = isWebView();
+    setIsWebViewDetected(webViewDetected);
+    
+    if (webViewDetected) {
+      console.log('WebView detected - using fallback audio methods');
+      toast({
+        title: "Native App Detected",
+        description: "Voice features may require native implementation for optimal performance.",
+        variant: "default",
+      });
+    }
+  }, [toast]);
 
   // Generate unique session ID on component mount
   useEffect(() => {
@@ -35,14 +51,12 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     console.log('Generated session ID:', newSessionId);
   }, []);
 
-  const initializeSpeechRecognition = useCallback(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition.current = new SpeechRecognition();
-      recognition.current.continuous = false;
-      recognition.current.interimResults = false;
-      recognition.current.lang = 'en-US';
-
+  const initializeSpeechRecognition = useCallback(async () => {
+    const recognitionInstance = await startSpeechRecognitionWithFallback();
+    
+    if (recognitionInstance) {
+      recognition.current = recognitionInstance;
+      
       recognition.current.onstart = () => {
         setIsListening(true);
         console.log('Voice recognition started');
@@ -73,10 +87,16 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         setIsListening(false);
         toast({
           title: "Voice Recognition Error",
-          description: "Please try speaking again.",
+          description: "Please try speaking again or use text input.",
           variant: "destructive",
         });
       };
+    } else {
+      toast({
+        title: "Voice Recognition Unavailable",
+        description: "Please use text input or enable microphone permissions.",
+        variant: "destructive",
+      });
     }
   }, [toast]);
 
@@ -111,7 +131,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         onResponseGenerated(assistantResponse);
       }
 
-      speakText(assistantResponse);
+      await speakText(assistantResponse);
 
     } catch (error) {
       console.error('Error calling ChatGPT API:', error);
@@ -125,51 +145,31 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     }
   };
 
-  const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      synthesis.current.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      const voices = synthesis.current.getVoices();
-      const femaleVoice = voices.find(voice => 
-        voice.name.toLowerCase().includes('female') || 
-        voice.name.toLowerCase().includes('woman') ||
-        voice.name.toLowerCase().includes('zira') ||
-        voice.name.toLowerCase().includes('eva') ||
-        voice.name.toLowerCase().includes('samantha')
-      );
-      
-      if (femaleVoice) {
-        utterance.voice = femaleVoice;
+  const speakText = async (text: string) => {
+    setIsSpeaking(true);
+    console.log('AI started speaking');
+    
+    try {
+      const success = await speakTextWithFallback(text);
+      if (!success && isWebViewDetected) {
+        // Show visual feedback that the text would be spoken
+        toast({
+          title: "Voice Output",
+          description: "Text ready for native speech synthesis",
+          variant: "default",
+        });
       }
-      
-      utterance.rate = 0.9;
-      utterance.pitch = 1.1;
-      utterance.volume = 0.9;
-      
-      utterance.onstart = () => {
-        setIsSpeaking(true);
-        console.log('AI started speaking');
-      };
-      
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        console.log('AI finished speaking');
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('Speech synthesis error:', event);
-        setIsSpeaking(false);
-      };
-
-      synthesis.current.speak(utterance);
+    } catch (error) {
+      console.error('Speech synthesis error:', error);
+    } finally {
+      setIsSpeaking(false);
+      console.log('AI finished speaking');
     }
   };
 
-  const startListening = () => {
+  const startListening = async () => {
     if (!recognition.current) {
-      initializeSpeechRecognition();
+      await initializeSpeechRecognition();
     }
     
     if (recognition.current && !isListening) {
@@ -193,14 +193,28 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   };
 
   const stopSpeaking = () => {
-    if (synthesis.current) {
-      synthesis.current.cancel();
-      setIsSpeaking(false);
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
     }
+    setIsSpeaking(false);
   };
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
+      {/* WebView Warning */}
+      {isWebViewDetected && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-orange-800">
+              <AlertCircle className="h-4 w-4" />
+              <p className="text-sm">
+                Running in native app mode. Voice features may require native implementation for full functionality.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Voice Controls */}
       <Card className="border-0 bg-gray-50">
         <CardContent className="text-center p-8">

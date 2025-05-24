@@ -19,6 +19,10 @@ const Index = () => {
                 <p className="text-sm text-gray-500">AI Voice Assistant</p>
               </div>
             </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">Armstrong Dematic</p>
+              <p className="text-xs text-gray-500">Intelligent Solutions</p>
+            </div>
           </div>
         </div>
       </header>
@@ -34,6 +38,9 @@ const Index = () => {
             <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
               Experience next-generation voice interaction powered by sophisticated AI technology. 
               Speak naturally, get intelligent responses.
+            </p>
+            <p className="text-sm text-gray-400 mt-4">
+              Powered by Armstrong Dematic's intelligent automation solutions
             </p>
           </div>
 
