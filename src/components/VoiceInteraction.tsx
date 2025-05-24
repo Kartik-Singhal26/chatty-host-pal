@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, AlertCircle, Languages, Settings } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -7,12 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   speakTextWithFallback, 
   startSpeechRecognitionWithFallback, 
-  isWebView, 
-  isAndroid,
   enableAutoplay, 
   detectLanguageFromSpeech,
-  getBrowserPreferredIndianLanguage,
-  setupAndroidInterface
+  getBrowserPreferredIndianLanguage
 } from '@/utils/audioFallback';
 import { SUPPORTED_LANGUAGES, Language, getLanguageByCode } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -35,11 +33,8 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isWebViewDetected, setIsWebViewDetected] = useState(false);
-  const [isAndroidDetected, setIsAndroidDetected] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
   const [autoLanguageDetection, setAutoLanguageDetection] = useState(true);
-  const [showSetupInstructions, setShowSetupInstructions] = useState(false);
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const { toast } = useToast();
@@ -49,12 +44,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     // Generate session ID
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
-    
-    // Detect environment
-    const webViewDetected = isWebView();
-    const androidDetected = isAndroid();
-    setIsWebViewDetected(webViewDetected);
-    setIsAndroidDetected(androidDetected);
     
     // Set default language based on browser preference
     const preferredLangCode = getBrowserPreferredIndianLanguage();
@@ -66,24 +55,9 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     // Initialize audio
     enableAutoplay();
     
-    // Show appropriate warnings/instructions
-    if (webViewDetected && androidDetected) {
-      setupAndroidInterface();
-      toast({
-        title: "एंड्रॉयड नेटिव ऐप डिटेक्ट / Android Native App Detected",
-        description: "बेहतर ऑडियो के लिए नेटिव इंटीग्रेशन की आवश्यकता / Native integration required for better audio",
-        variant: "default",
-      });
-      
-      // Show setup instructions after a delay
-      setTimeout(() => setShowSetupInstructions(true), 3000);
-    }
-    
     console.log('VoiceInteraction initialized:', { 
       sessionId: newSessionId, 
-      language: preferredLanguage?.name, 
-      isWebView: webViewDetected, 
-      isAndroid: androidDetected 
+      language: preferredLanguage?.name
     });
   }, [toast]);
 
@@ -95,19 +69,19 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       
       recognition.current.onstart = () => {
         setIsListening(true);
-        console.log(`वॉइस रिकॉग्निशन शुरू / Voice recognition started in ${selectedLanguage.nativeName}`);
+        console.log(`Voice recognition started in ${selectedLanguage.nativeName}`);
       };
 
       recognition.current.onend = () => {
         setIsListening(false);
-        console.log('वॉइस रिकॉग्निशन बंद / Voice recognition ended');
+        console.log('Voice recognition ended');
       };
 
       recognition.current.onresult = async (event) => {
         const transcript = event.results[0][0].transcript;
         const confidence = event.results[0][0].confidence;
         
-        console.log(`ट्रांसक्रिप्ट / Transcript: "${transcript}" (Confidence: ${confidence?.toFixed(2) || 'N/A'})`);
+        console.log(`Transcript: "${transcript}" (Confidence: ${confidence?.toFixed(2) || 'N/A'})`);
         
         // Auto-detect language if enabled
         let detectedLanguage = selectedLanguage;
@@ -118,11 +92,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
           if (newDetectedLanguage && newDetectedLanguage.code !== selectedLanguage.code) {
             detectedLanguage = newDetectedLanguage;
             setSelectedLanguage(newDetectedLanguage);
-            console.log(`भाषा बदली गई / Language auto-switched to: ${newDetectedLanguage.nativeName}`);
+            console.log(`Language auto-switched to: ${newDetectedLanguage.nativeName}`);
             
             toast({
-              title: "भाषा डिटेक्ट हुई / Language Detected",
-              description: `${newDetectedLanguage.nativeName} में स्विच किया गया / Switched to ${newDetectedLanguage.name}`,
+              title: "Language Detected",
+              description: `Switched to ${newDetectedLanguage.name}`,
               variant: "default",
             });
           }
@@ -145,26 +119,26 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         setIsListening(false);
         
         const errorMessages = {
-          'network': 'नेटवर्क एरर / Network error - कृपया कनेक्शन चेक करें / Please check connection',
-          'not-allowed': 'माइक्रोफोन अनुमति चाहिए / Microphone permission required',
-          'no-speech': 'कोई आवाज नहीं सुनाई दी / No speech detected',
-          'audio-capture': 'ऑडियो कैप्चर एरर / Audio capture error',
-          'service-not-allowed': 'स्पीच सेवा उपलब्ध नहीं / Speech service not available'
+          'network': 'Network error - Please check connection',
+          'not-allowed': 'Microphone permission required',
+          'no-speech': 'No speech detected',
+          'audio-capture': 'Audio capture error',
+          'service-not-allowed': 'Speech service not available'
         };
         
         const errorMessage = errorMessages[event.error as keyof typeof errorMessages] || 
-                           `वॉइस एरर / Voice error: ${event.error}`;
+                           `Voice error: ${event.error}`;
         
         toast({
-          title: "वॉइस रिकॉग्निशन एरर / Voice Recognition Error",
+          title: "Voice Recognition Error",
           description: errorMessage,
           variant: "destructive",
         });
       };
     } else {
       toast({
-        title: "वॉइस रिकॉग्निशन उपलब्ध नहीं / Voice Recognition Unavailable",
-        description: "कृपया टेक्स्ट इनपुट का उपयोग करें / Please use text input",
+        title: "Voice Recognition Unavailable",
+        description: "Please use text input",
         variant: "destructive",
       });
     }
@@ -172,7 +146,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   const processWithChatGPT = async (userInput: string, languageCode: string = selectedLanguage.code) => {
     setIsProcessing(true);
-    console.log(`GPT-4o के साथ प्रोसेसिंग / Processing with GPT-4o: "${userInput}" (Language: ${languageCode})`);
+    console.log(`Processing with GPT-4o: "${userInput}" (Language: ${languageCode})`);
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
@@ -208,8 +182,8 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     } catch (error) {
       console.error('ChatGPT API error:', error);
       toast({
-        title: "एरर / Error",
-        description: "कृपया दोबारा कोशिश करें / Please try again",
+        title: "Error",
+        description: "Please try again",
         variant: "destructive",
       });
     } finally {
@@ -220,29 +194,16 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const speakText = async (text: string, languageCode: string = selectedLanguage.code) => {
     setIsSpeaking(true);
     const language = getLanguageByCode(languageCode) || selectedLanguage;
-    console.log(`AI बोलना शुरू / AI started speaking in ${language.nativeName}`);
+    console.log(`AI started speaking in ${language.nativeName}`);
     
     try {
       const speechCode = `${languageCode}-IN`;
-      const success = await speakTextWithFallback(text, speechCode);
-      
-      if (!success && (isWebViewDetected || isAndroidDetected)) {
-        toast({
-          title: "ऑडियो आउटपुट / Audio Output",
-          description: "नेटिव इंटीग्रेशन से बेहतर परिणाम मिलेंगे / Better results with native integration",
-          variant: "default",
-        });
-      }
+      await speakTextWithFallback(text, speechCode);
     } catch (error) {
       console.error('Speech synthesis error:', error);
-      toast({
-        title: "ऑडियो एरर / Audio Error",
-        description: "आवाज में समस्या, कृपया नेटिव सेटअप चेक करें / Audio issue, please check native setup",
-        variant: "destructive",
-      });
     } finally {
       setIsSpeaking(false);
-      console.log('AI बोलना समाप्त / AI finished speaking');
+      console.log('AI finished speaking');
     }
   };
 
@@ -257,8 +218,8 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       } catch (error) {
         console.error('Error starting recognition:', error);
         toast({
-          title: "माइक्रोफोन एरर / Microphone Error",
-          description: "कृपया माइक अनुमति दें / Please allow microphone access",
+          title: "Microphone Error",
+          description: "Please allow microphone access",
           variant: "destructive",
         });
       }
@@ -283,7 +244,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     if (recognition.current) {
       recognition.current = null;
     }
-    console.log(`भाषा बदली गई / Language changed to: ${language.nativeName}`);
+    console.log(`Language changed to: ${language.nativeName}`);
   }, []);
 
   return (
@@ -302,70 +263,10 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         >
           <Languages className="h-4 w-4" />
           <span className="hidden sm:inline">
-            {autoLanguageDetection ? 'ऑटो डिटेक्शन चालू / Auto Detection ON' : 'ऑटो डिटेक्शन बंद / Auto Detection OFF'}
+            {autoLanguageDetection ? 'Auto Detection ON' : 'Auto Detection OFF'}
           </span>
         </Button>
       </div>
-
-      {/* Android Setup Warning */}
-      {isWebViewDetected && isAndroidDetected && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-orange-800">
-                <AlertCircle className="h-4 w-4" />
-                <div>
-                  <p className="text-sm font-medium">
-                    एंड्रॉयड APK में चल रहा है / Running in Android APK
-                  </p>
-                  <p className="text-xs text-orange-600">
-                    ऑडियो के लिए नेटिव इंटीग्रेशन आवश्यक / Native integration required for audio
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSetupInstructions(!showSetupInstructions)}
-                className="gap-2"
-              >
-                <Settings className="h-3 w-3" />
-                सेटअप / Setup
-              </Button>
-            </div>
-            
-            {showSetupInstructions && (
-              <div className="mt-4 p-3 bg-white rounded text-xs">
-                <h4 className="font-medium text-gray-800 mb-2">Android Integration Setup:</h4>
-                <ol className="list-decimal list-inside space-y-1 text-gray-600">
-                  <li>Add JavaScript interface: <code className="bg-gray-100 px-1">webView.addJavascriptInterface(new AndroidTTSInterface(this), "Android")</code></li>
-                  <li>Implement TTS interface with <code className="bg-gray-100 px-1">speak(text, language)</code> method</li>
-                  <li>Add RECORD_AUDIO permission to AndroidManifest.xml</li>
-                  <li>Initialize TextToSpeech in your Activity</li>
-                </ol>
-                <p className="mt-2 text-orange-600">
-                  चेक कंसोल लॉग्स फॉर डिटेल्ड इंस्ट्रक्शन्स / Check console logs for detailed instructions
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* WebView Warning for non-Android */}
-      {isWebViewDetected && !isAndroidDetected && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-blue-800">
-              <AlertCircle className="h-4 w-4" />
-              <p className="text-sm">
-                नेटिव ऐप मोड में चल रहा है / Running in native app mode. 
-                पूर्ण कार्यक्षमता के लिए नेटिव इम्प्लीमेंटेशन आवश्यक / Native implementation required for full functionality.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Voice Controls */}
       <Card className="border-0 bg-gray-50">
@@ -406,20 +307,19 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
           <div className="text-sm">
             {isListening && (
               <p className="text-black font-medium">
-                {selectedLanguage.nativeName} में सुन रहा हूँ / Listening in {selectedLanguage.name}...
+                Listening in {selectedLanguage.name}...
               </p>
             )}
             {isProcessing && (
-              <p className="text-gray-600 font-medium">प्रोसेसिंग / Processing...</p>
+              <p className="text-gray-600 font-medium">Processing...</p>
             )}
             {isSpeaking && (
               <p className="text-black font-medium">
-                {selectedLanguage.nativeName} में बोल रहा हूँ / Speaking in {selectedLanguage.name}...
+                Speaking in {selectedLanguage.name}...
               </p>
             )}
             {!isListening && !isProcessing && !isSpeaking && (
               <p className="text-gray-500">
-                {selectedLanguage.nativeName} में वॉइस इंटरैक्शन शुरू करने के लिए क्लिक करें / 
                 Click to start voice interaction in {selectedLanguage.name}
               </p>
             )}
@@ -433,7 +333,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-4 text-sm text-gray-500">
               <MessageCircle className="h-4 w-4" />
-              <span>बातचीत / Conversation</span>
+              <span>Conversation</span>
             </div>
             <div className="space-y-4 max-h-80 overflow-y-auto">
               {messages.map((message) => {
