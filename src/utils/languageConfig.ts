@@ -8,15 +8,18 @@ export interface Language {
 
 export const SUPPORTED_LANGUAGES: Language[] = [
   { code: 'en', name: 'English', speechCode: 'en-US', flag: '🇺🇸' },
-  { code: 'es', name: 'Español', speechCode: 'es-ES', flag: '🇪🇸' },
-  { code: 'fr', name: 'Français', speechCode: 'fr-FR', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', speechCode: 'de-DE', flag: '🇩🇪' },
-  { code: 'it', name: 'Italiano', speechCode: 'it-IT', flag: '🇮🇹' },
-  { code: 'pt', name: 'Português', speechCode: 'pt-BR', flag: '🇧🇷' },
-  { code: 'ru', name: 'Русский', speechCode: 'ru-RU', flag: '🇷🇺' },
-  { code: 'ja', name: '日本語', speechCode: 'ja-JP', flag: '🇯🇵' },
-  { code: 'ko', name: '한국어', speechCode: 'ko-KR', flag: '🇰🇷' },
-  { code: 'zh', name: '中文', speechCode: 'zh-CN', flag: '🇨🇳' },
+  { code: 'hi', name: 'हिन्दी', speechCode: 'hi-IN', flag: '🇮🇳' },
+  { code: 'bn', name: 'বাংলা', speechCode: 'bn-IN', flag: '🇮🇳' },
+  { code: 'te', name: 'తెలుగు', speechCode: 'te-IN', flag: '🇮🇳' },
+  { code: 'mr', name: 'मराठी', speechCode: 'mr-IN', flag: '🇮🇳' },
+  { code: 'ta', name: 'தமிழ்', speechCode: 'ta-IN', flag: '🇮🇳' },
+  { code: 'gu', name: 'ગુજરાતી', speechCode: 'gu-IN', flag: '🇮🇳' },
+  { code: 'kn', name: 'ಕನ್ನಡ', speechCode: 'kn-IN', flag: '🇮🇳' },
+  { code: 'ml', name: 'മലയാളം', speechCode: 'ml-IN', flag: '🇮🇳' },
+  { code: 'pa', name: 'ਪੰਜਾਬੀ', speechCode: 'pa-IN', flag: '🇮🇳' },
+  { code: 'or', name: 'ଓଡ଼ିଆ', speechCode: 'or-IN', flag: '🇮🇳' },
+  { code: 'as', name: 'অসমীয়া', speechCode: 'as-IN', flag: '🇮🇳' },
+  { code: 'ur', name: 'اردو', speechCode: 'ur-IN', flag: '🇮🇳' },
 ];
 
 export const getLanguageByCode = (code: string): Language | undefined => {

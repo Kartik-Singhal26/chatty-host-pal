@@ -151,15 +151,18 @@ export const startSpeechRecognitionWithFallback = (languageCode: string = 'en-US
 // Auto-detect language from speech patterns
 export const detectLanguageFromSpeech = (transcript: string): string => {
   const languagePatterns = {
-    'es': /\b(hola|gracias|por favor|buenos días|buenas tardes|sí|no|muy bien)\b/i,
-    'fr': /\b(bonjour|merci|s'il vous plaît|bonsoir|oui|non|très bien|comment allez-vous)\b/i,
-    'de': /\b(hallo|danke|bitte|guten tag|guten abend|ja|nein|sehr gut|wie geht es)\b/i,
-    'it': /\b(ciao|grazie|prego|buongiorno|buonasera|sì|no|molto bene|come stai)\b/i,
-    'pt': /\b(olá|obrigado|por favor|bom dia|boa tarde|sim|não|muito bem|como está)\b/i,
-    'ru': /\b(привет|спасибо|пожалуйста|добрый день|добрый вечер|да|нет|очень хорошо)\b/i,
-    'ja': /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/,
-    'ko': /[\uAC00-\uD7AF]/,
-    'zh': /[\u4E00-\u9FFF]/,
+    'hi': /\b(नमस्ते|धन्यवाद|कृपया|हाँ|नहीं|अच्छा|क्या हाल है|सुप्रभात)\b/i,
+    'bn': /\b(নমস্কার|ধন্যবাদ|দয়া করে|হ্যাঁ|না|ভাল|কেমন আছেন|সুপ্রভাত)\b/i,
+    'te': /\b(నమస్కారం|ధన్యవాదాలు|దయచేసి|అవును|లేదు|బాగుంది|ఎలా ఉన్నారు|శుభోదయం)\b/i,
+    'mr': /\b(नमस्कार|धन्यवाद|कृपया|होय|नाही|चांगले|कसे आहात|सुप्रभात)\b/i,
+    'ta': /\b(வணக்கம்|நன்றி|தயவுசெய்து|ஆம்|இல்லை|நல்லது|எப்படி இருக்கீங்க|காலை வணக்கம்)\b/i,
+    'gu': /\b(નમસ્તે|આભાર|કૃપા કરીને|હા|ના|સારું|કેમ છો|સુપ્રભાત)\b/i,
+    'kn': /\b(ನಮಸ್ಕಾರ|ಧನ್ಯವಾದಗಳು|ದಯವಿಟ್ಟು|ಹೌದು|ಇಲ್ಲ|ಒಳ್ಳೆಯದು|ಹೇಗಿದ್ದೀರಿ|ಸುಪ್ರಭಾತ)\b/i,
+    'ml': /\b(നമസ്കാരം|നന്ദി|ദയവായി|അതെ|ഇല്ല|നല്ലത്|എങ്ങനെയുണ്ട്|സുപ്രഭാതം)\b/i,
+    'pa': /\b(ਸਤ ਸ੍ਰੀ ਅਕਾਲ|ਧੰਨਵਾਦ|ਕਿਰਪਾ ਕਰਕੇ|ਹਾਂ|ਨਹੀਂ|ਚੰਗਾ|ਕਿਵੇਂ ਹੋ|ਸ਼ੁਭ ਸਵੇਰ)\b/i,
+    'or': /\b(ନମସ୍କାର|ଧନ୍ୟବାଦ|ଦୟାକରି|ହଁ|ନାହିଁ|ଭଲ|କେମିତି ଅଛନ୍ତି|ସୁପ୍ରଭାତ)\b/i,
+    'as': /\b(নমস্কাৰ|ধন্যবাদ|অনুগ্ৰহ কৰি|হয়|নহয়|ভাল|কেনে আছে|শুভ ৰাতিপুৱা)\b/i,
+    'ur': /\b(آداب|شکریہ|براہ کرم|ہاں|نہیں|اچھا|کیسے ہیں|صبح بخیر)\b/i,
   };
 
   // Check for specific language patterns
