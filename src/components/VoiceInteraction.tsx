@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Phone, Coffee, Bed } from
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -28,7 +29,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       timestamp: new Date()
     }
   ]);
-  const [apiKey, setApiKey] = useState('');
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const synthesis = useRef<SpeechSynthesis>(window.speechSynthesis);
@@ -80,58 +80,19 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   }, [toast]);
 
   const processWithChatGPT = async (userInput: string) => {
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your OpenAI API key to use ChatGPT-4o.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsProcessing(true);
     console.log('Processing with ChatGPT-4o:', userInput);
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a helpful hospitality assistant for a luxury hotel. You can help guests with:
-              - Room service orders and dining recommendations
-              - Hotel amenities and services information
-              - Local attractions and recommendations
-              - Concierge services
-              - Housekeeping requests
-              - Check-in/check-out assistance
-              - Spa and wellness bookings
-              - Transportation arrangements
-              
-              Respond in a warm, professional, and helpful manner. Keep responses concise but informative. Always ask if there's anything else you can help with.`
-            },
-            {
-              role: 'user',
-              content: userInput
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 300,
-        }),
+      const { data, error } = await supabase.functions.invoke('chat-gpt', {
+        body: { userInput }
       });
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      const data = await response.json();
-      const assistantResponse = data.choices[0].message.content;
+      const assistantResponse = data.response;
 
       const assistantMessage: Message = {
         id: Date.now().toString(),
@@ -153,7 +114,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       console.error('Error calling ChatGPT API:', error);
       toast({
         title: "Error",
-        description: "Failed to process your request. Please check your API key and try again.",
+        description: "Failed to process your request. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -224,31 +185,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-      {/* API Key Input */}
-      {!apiKey && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle className="text-amber-800 flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              OpenAI API Key Required
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <p className="text-amber-700 text-sm">
-                Please enter your OpenAI API key to enable ChatGPT-4o integration for intelligent hospitality assistance.
-              </p>
-              <input
-                type="password"
-                placeholder="Enter your OpenAI API key"
-                className="w-full px-3 py-2 border border-amber-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Voice Controls */}
       <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
         <CardHeader>
@@ -261,7 +197,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
           <div className="flex justify-center items-center gap-4">
             <Button
               onClick={isListening ? stopListening : startListening}
-              disabled={isProcessing || !apiKey}
+              disabled={isProcessing}
               size="lg"
               className={`h-16 w-16 rounded-full transition-all duration-300 ${
                 isListening 
