@@ -13,7 +13,6 @@ import {
 } from '@/utils/audioFallback';
 import { SUPPORTED_LANGUAGES, Language, getLanguageByCode, VoiceGender } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
-import VoiceGenderSelector from '@/components/VoiceGenderSelector';
 
 interface Message {
   id: string;
@@ -62,6 +61,39 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     });
   }, [toast]);
 
+  // Function to detect voice gender commands
+  const detectGenderCommand = (transcript: string): VoiceGender | null => {
+    const lowerTranscript = transcript.toLowerCase();
+    
+    // English commands
+    if (lowerTranscript.includes('change to male voice') || 
+        lowerTranscript.includes('switch to male voice') ||
+        lowerTranscript.includes('use male voice')) {
+      return 'male';
+    }
+    
+    if (lowerTranscript.includes('change to female voice') || 
+        lowerTranscript.includes('switch to female voice') ||
+        lowerTranscript.includes('use female voice')) {
+      return 'female';
+    }
+
+    // Hindi commands
+    if (lowerTranscript.includes('पुरुष आवाज') || 
+        lowerTranscript.includes('मर्द की आवाज') ||
+        lowerTranscript.includes('male voice')) {
+      return 'male';
+    }
+    
+    if (lowerTranscript.includes('महिला आवाज') || 
+        lowerTranscript.includes('औरत की आवाज') ||
+        lowerTranscript.includes('female voice')) {
+      return 'female';
+    }
+
+    return null;
+  };
+
   const initializeSpeechRecognition = useCallback(async () => {
     const recognitionInstance = await startSpeechRecognitionWithFallback(selectedLanguage.speechCode);
     
@@ -83,6 +115,19 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         const confidence = event.results[0][0].confidence;
         
         console.log(`Transcript: "${transcript}" (Confidence: ${confidence?.toFixed(2) || 'N/A'})`);
+        
+        // Check for gender commands first
+        const genderCommand = detectGenderCommand(transcript);
+        if (genderCommand) {
+          setSelectedGender(genderCommand);
+          toast({
+            title: "Voice Updated",
+            description: `Switched to ${genderCommand} voice`,
+            variant: "default",
+          });
+          console.log(`Voice gender changed to: ${genderCommand}`);
+          return; // Don't process as regular message
+        }
         
         // Auto-detect language if enabled
         let detectedLanguage = selectedLanguage;
@@ -248,28 +293,13 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     console.log(`Language changed to: ${language.nativeName}`);
   }, []);
 
-  const handleGenderChange = useCallback((gender: VoiceGender) => {
-    setSelectedGender(gender);
-    console.log(`Voice gender changed to: ${gender}`);
-    
-    toast({
-      title: "Voice Updated",
-      description: `Switched to ${gender} voice`,
-      variant: "default",
-    });
-  }, [toast]);
-
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
-      {/* Language and Gender Selectors */}
+      {/* Language Selector and Auto Detection Toggle */}
       <div className="flex justify-center items-center gap-4 flex-wrap">
         <LanguageSelector
           selectedLanguage={selectedLanguage}
           onLanguageChange={handleLanguageChange}
-        />
-        <VoiceGenderSelector
-          selectedGender={selectedGender}
-          onGenderChange={handleGenderChange}
         />
         <Button
           variant={autoLanguageDetection ? "default" : "outline"}
@@ -335,9 +365,14 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
               </p>
             )}
             {!isListening && !isProcessing && !isSpeaking && (
-              <p className="text-gray-500">
-                Click to start voice interaction in {selectedLanguage.name} with {selectedGender} voice
-              </p>
+              <div>
+                <p className="text-gray-500 mb-2">
+                  Click to start voice interaction in {selectedLanguage.name} with {selectedGender} voice
+                </p>
+                <p className="text-xs text-gray-400">
+                  Say "change to male voice" or "change to female voice" to switch voice gender
+                </p>
+              </div>
             )}
           </div>
         </CardContent>
