@@ -1,11 +1,10 @@
-
 // Utility to detect if we're running in a WebView/native app
 export const isWebView = (): boolean => {
   const userAgent = navigator.userAgent;
   return (
     userAgent.includes('wv') || // Android WebView
     userAgent.includes('Version/') && userAgent.includes('Mobile') || // iOS WebView
-    window.navigator.standalone === true || // iOS PWA
+    (navigator as any).standalone === true || // iOS PWA
     (window as any).ReactNativeWebView !== undefined // React Native WebView
   );
 };
