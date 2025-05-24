@@ -144,3 +144,30 @@ export const startSpeechRecognitionWithFallback = (languageCode: string = 'en-US
     }
   });
 };
+
+// Auto-detect language from speech patterns
+export const detectLanguageFromSpeech = (transcript: string): string => {
+  const languagePatterns = {
+    'es': /\b(hola|gracias|por favor|buenos días|buenas tardes|sí|no|muy bien)\b/i,
+    'fr': /\b(bonjour|merci|s'il vous plaît|bonsoir|oui|non|très bien|comment allez-vous)\b/i,
+    'de': /\b(hallo|danke|bitte|guten tag|guten abend|ja|nein|sehr gut|wie geht es)\b/i,
+    'it': /\b(ciao|grazie|prego|buongiorno|buonasera|sì|no|molto bene|come stai)\b/i,
+    'pt': /\b(olá|obrigado|por favor|bom dia|boa tarde|sim|não|muito bem|como está)\b/i,
+    'ru': /\b(привет|спасибо|пожалуйста|добрый день|добрый вечер|да|нет|очень хорошо)\b/i,
+    'ja': /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/,
+    'ko': /[\uAC00-\uD7AF]/,
+    'zh': /[\u4E00-\u9FFF]/,
+  };
+
+  // Check for specific language patterns
+  for (const [langCode, pattern] of Object.entries(languagePatterns)) {
+    if (pattern.test(transcript)) {
+      console.log(`Detected language: ${langCode} from transcript: "${transcript}"`);
+      return langCode;
+    }
+  }
+
+  // Default to English if no pattern matches
+  console.log(`No language detected from transcript: "${transcript}", defaulting to English`);
+  return 'en';
+};

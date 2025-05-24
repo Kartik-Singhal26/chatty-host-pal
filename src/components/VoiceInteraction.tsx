@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { speakTextWithFallback, startSpeechRecognitionWithFallback, isWebView, enableAutoplay } from '@/utils/audioFallback';
+import { speakTextWithFallback, startSpeechRecognitionWithFallback, isWebView, enableAutoplay, detectLanguageFromSpeech } from '@/utils/audioFallback';
 import { SUPPORTED_LANGUAGES, Language, getLanguageByCode } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -89,6 +89,21 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       recognition.current.onresult = async (event) => {
         const transcript = event.results[0][0].transcript;
         console.log('Transcript:', transcript, 'Language:', selectedLanguage.name);
+        
+        // Auto-detect language from speech
+        const detectedLangCode = detectLanguageFromSpeech(transcript);
+        const detectedLanguage = getLanguageByCode(detectedLangCode);
+        
+        // Switch language if different from current selection
+        if (detectedLanguage && detectedLanguage.code !== selectedLanguage.code) {
+          console.log('Auto-switching to detected language:', detectedLanguage.name);
+          setSelectedLanguage(detectedLanguage);
+          toast({
+            title: "Language Detected",
+            description: `Switched to ${detectedLanguage.name}`,
+            variant: "default",
+          });
+        }
         
         const userMessage: Message = {
           id: Date.now().toString(),
