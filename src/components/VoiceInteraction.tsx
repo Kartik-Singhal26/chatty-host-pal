@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Phone, Coffee, Bed, Brain } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -10,7 +11,6 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  knowledgeUsed?: number;
 }
 
 interface VoiceInteractionProps {
@@ -22,14 +22,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: "Good day! I'm Elena, your personal hospitality assistant. I'm here to ensure your stay is absolutely perfect. Whether you need dining recommendations, local insights, or assistance with our amenities, I'm delighted to help. How may I be of service today?",
-      isUser: false,
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const synthesis = useRef<SpeechSynthesis>(window.speechSynthesis);
@@ -104,14 +97,12 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       }
 
       const assistantResponse = data.response;
-      const knowledgeUsed = data.knowledgeUsed || 0;
 
       const assistantMessage: Message = {
         id: Date.now().toString(),
         text: assistantResponse,
         isUser: false,
-        timestamp: new Date(),
-        knowledgeUsed
+        timestamp: new Date()
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -120,7 +111,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         onResponseGenerated(assistantResponse);
       }
 
-      // Speak the response with professional female voice
       speakText(assistantResponse);
 
     } catch (error) {
@@ -137,12 +127,10 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
-      // Stop any ongoing speech
       synthesis.current.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Enhanced voice settings for professional female voice
       const voices = synthesis.current.getVoices();
       const femaleVoice = voices.find(voice => 
         voice.name.toLowerCase().includes('female') || 
@@ -156,19 +144,18 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         utterance.voice = femaleVoice;
       }
       
-      // Professional voice settings
-      utterance.rate = 0.85; // Slightly slower for elegance
-      utterance.pitch = 1.1; // Slightly higher pitch
-      utterance.volume = 0.9; // Clear volume
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.9;
       
       utterance.onstart = () => {
         setIsSpeaking(true);
-        console.log('Elena started speaking');
+        console.log('AI started speaking');
       };
       
       utterance.onend = () => {
         setIsSpeaking(false);
-        console.log('Elena finished speaking');
+        console.log('AI finished speaking');
       };
       
       utterance.onerror = (event) => {
@@ -213,25 +200,19 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-3xl mx-auto space-y-8">
       {/* Voice Controls */}
-      <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
-        <CardHeader>
-          <CardTitle className="text-center text-blue-800 flex items-center justify-center gap-2">
-            <Phone className="h-6 w-6" />
-            Elena - Your Hospitality Assistant
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <div className="flex justify-center items-center gap-4">
+      <Card className="border-0 bg-gray-50">
+        <CardContent className="text-center p-8">
+          <div className="flex justify-center items-center gap-6 mb-6">
             <Button
               onClick={isListening ? stopListening : startListening}
               disabled={isProcessing}
               size="lg"
-              className={`h-16 w-16 rounded-full transition-all duration-300 ${
+              className={`h-20 w-20 rounded-full transition-all duration-300 border-0 ${
                 isListening 
-                  ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-200' 
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200'
+                  ? 'bg-red-500 hover:bg-red-600 shadow-lg scale-110' 
+                  : 'bg-black hover:bg-gray-800 shadow-lg hover:scale-105'
               }`}
             >
               {isListening ? (
@@ -246,98 +227,59 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
               disabled={!isSpeaking}
               size="lg"
               variant="outline"
-              className="h-16 w-16 rounded-full border-2"
+              className="h-16 w-16 rounded-full border-2 bg-white"
             >
               {isSpeaking ? (
-                <VolumeX className="h-8 w-8 text-red-500" />
+                <VolumeX className="h-6 w-6 text-red-500" />
               ) : (
-                <Volume2 className="h-8 w-8 text-gray-400" />
+                <Volume2 className="h-6 w-6 text-gray-400" />
               )}
             </Button>
           </div>
 
-          <div className="text-sm text-gray-600">
-            {isListening && <p className="text-blue-600 font-medium animate-pulse">🎤 Elena is listening...</p>}
-            {isProcessing && <p className="text-amber-600 font-medium">🧠 Elena is thinking...</p>}
-            {isSpeaking && <p className="text-green-600 font-medium">🔊 Elena is speaking...</p>}
+          <div className="text-sm">
+            {isListening && <p className="text-black font-medium">Listening...</p>}
+            {isProcessing && <p className="text-gray-600 font-medium">Processing...</p>}
+            {isSpeaking && <p className="text-black font-medium">Speaking...</p>}
             {!isListening && !isProcessing && !isSpeaking && (
-              <p className="text-gray-500">Click the microphone to speak with Elena</p>
+              <p className="text-gray-500">Click to start voice interaction</p>
             )}
           </div>
         </CardContent>
       </Card>
-
-      {/* Service Categories */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-emerald-200 bg-emerald-50 hover:shadow-md transition-shadow">
-          <CardContent className="p-4 text-center">
-            <Coffee className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-emerald-800">Room Service</h3>
-            <p className="text-sm text-emerald-600">Dining & beverages</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-purple-50 hover:shadow-md transition-shadow">
-          <CardContent className="p-4 text-center">
-            <Bed className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-purple-800">Concierge</h3>
-            <p className="text-sm text-purple-600">Local recommendations</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
-          <CardContent className="p-4 text-center">
-            <MessageCircle className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-orange-800">Guest Services</h3>
-            <p className="text-sm text-orange-600">Amenities & support</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Conversation Display */}
-      <Card className="border-gray-200">
-        <CardHeader>
-          <CardTitle className="text-gray-800 flex items-center gap-2">
-            Conversation with Elena
-            {sessionId && (
-              <span className="text-xs text-gray-500 font-normal">
-                Session: {sessionId.slice(-8)}
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
-              >
+      {messages.length > 0 && (
+        <Card className="border-0 bg-white shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4 text-sm text-gray-500">
+              <MessageCircle className="h-4 w-4" />
+              <span>Conversation</span>
+            </div>
+            <div className="space-y-4 max-h-80 overflow-y-auto">
+              {messages.map((message) => (
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.isUser
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
+                  key={message.id}
+                  className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
                 >
-                  <p className="text-sm">{message.text}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs opacity-70">
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl text-sm ${
+                      message.isUser
+                        ? 'bg-black text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    <p>{message.text}</p>
+                    <p className="text-xs opacity-70 mt-1">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
-                    {message.knowledgeUsed !== undefined && message.knowledgeUsed > 0 && (
-                      <div className="flex items-center gap-1 text-xs opacity-70">
-                        <Brain className="h-3 w-3" />
-                        <span>{message.knowledgeUsed}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
