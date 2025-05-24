@@ -5,6 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { speakTextWithFallback, startSpeechRecognitionWithFallback, isWebView, enableAutoplay } from '@/utils/audioFallback';
+import { SUPPORTED_LANGUAGES, Language, getLanguageByCode } from '@/utils/languageConfig';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface Message {
   id: string;
@@ -24,6 +26,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isWebViewDetected, setIsWebViewDetected] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const { toast } = useToast();
@@ -57,18 +60,25 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       console.log('Audio initialization completed');
     };
     
+    // Detect browser language and set default
+    const browserLang = navigator.language.split('-')[0];
+    const detectedLanguage = getLanguageByCode(browserLang);
+    if (detectedLanguage) {
+      setSelectedLanguage(detectedLanguage);
+    }
+    
     initializeAudio();
   }, []);
 
   const initializeSpeechRecognition = useCallback(async () => {
-    const recognitionInstance = await startSpeechRecognitionWithFallback();
+    const recognitionInstance = await startSpeechRecognitionWithFallback(selectedLanguage.speechCode);
     
     if (recognitionInstance) {
       recognition.current = recognitionInstance;
       
       recognition.current.onstart = () => {
         setIsListening(true);
-        console.log('Voice recognition started');
+        console.log('Voice recognition started in', selectedLanguage.name);
       };
 
       recognition.current.onend = () => {
@@ -78,7 +88,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
       recognition.current.onresult = async (event) => {
         const transcript = event.results[0][0].transcript;
-        console.log('Transcript:', transcript);
+        console.log('Transcript:', transcript, 'Language:', selectedLanguage.name);
         
         const userMessage: Message = {
           id: Date.now().toString(),
@@ -107,17 +117,18 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, selectedLanguage]);
 
   const processWithChatGPT = async (userInput: string) => {
     setIsProcessing(true);
-    console.log('Processing with ChatGPT-4o:', userInput, 'Session:', sessionId);
+    console.log('Processing with ChatGPT-4o:', userInput, 'Session:', sessionId, 'Language:', selectedLanguage.name);
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
         body: { 
           userInput,
-          sessionId 
+          sessionId,
+          language: selectedLanguage.code
         }
       });
 
@@ -156,10 +167,10 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   const speakText = async (text: string) => {
     setIsSpeaking(true);
-    console.log('AI started speaking');
+    console.log('AI started speaking in', selectedLanguage.name);
     
     try {
-      const success = await speakTextWithFallback(text);
+      const success = await speakTextWithFallback(text, selectedLanguage.speechCode);
       if (!success && isWebViewDetected) {
         // Show visual feedback that the text would be spoken
         toast({
@@ -208,8 +219,25 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     setIsSpeaking(false);
   };
 
+  const handleLanguageChange = useCallback((language: Language) => {
+    setSelectedLanguage(language);
+    // Reset recognition to use new language
+    if (recognition.current) {
+      recognition.current = null;
+    }
+    console.log('Language changed to:', language.name);
+  }, []);
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
+      {/* Language Selector */}
+      <div className="flex justify-center">
+        <LanguageSelector
+          selectedLanguage={selectedLanguage}
+          onLanguageChange={handleLanguageChange}
+        />
+      </div>
+
       {/* WebView Warning */}
       {isWebViewDetected && (
         <Card className="border-orange-200 bg-orange-50">
@@ -261,11 +289,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
           </div>
 
           <div className="text-sm">
-            {isListening && <p className="text-black font-medium">Listening...</p>}
+            {isListening && <p className="text-black font-medium">Listening in {selectedLanguage.name}...</p>}
             {isProcessing && <p className="text-gray-600 font-medium">Processing...</p>}
-            {isSpeaking && <p className="text-black font-medium">Speaking...</p>}
+            {isSpeaking && <p className="text-black font-medium">Speaking in {selectedLanguage.name}...</p>}
             {!isListening && !isProcessing && !isSpeaking && (
-              <p className="text-gray-500">Click to start voice interaction</p>
+              <p className="text-gray-500">Click to start voice interaction in {selectedLanguage.name}</p>
             )}
           </div>
         </CardContent>

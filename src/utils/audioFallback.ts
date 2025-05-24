@@ -1,4 +1,3 @@
-
 // Utility to detect if we're running in a WebView/native app
 export const isWebView = (): boolean => {
   const userAgent = navigator.userAgent;
@@ -37,8 +36,8 @@ export const enableAutoplay = async (): Promise<void> => {
   }
 };
 
-// Enhanced speech synthesis with autoplay support
-export const speakTextWithFallback = async (text: string): Promise<boolean> => {
+// Enhanced speech synthesis with autoplay support and language selection
+export const speakTextWithFallback = async (text: string, languageCode: string = 'en-US'): Promise<boolean> => {
   // Enable autoplay if possible
   await enableAutoplay();
 
@@ -54,17 +53,13 @@ export const speakTextWithFallback = async (text: string): Promise<boolean> => {
         // Wait for voices to load
         const speakWithVoice = () => {
           const voices = speechSynthesis.getVoices();
-          const femaleVoice = voices.find(voice => 
-            voice.name.toLowerCase().includes('female') || 
-            voice.name.toLowerCase().includes('woman') ||
-            voice.name.toLowerCase().includes('zira') ||
-            voice.name.toLowerCase().includes('eva') ||
-            voice.name.toLowerCase().includes('samantha') ||
-            voice.name.toLowerCase().includes('alloy')
-          );
+          const preferredVoice = getPreferredVoice(voices, languageCode);
           
-          if (femaleVoice) {
-            utterance.voice = femaleVoice;
+          if (preferredVoice) {
+            utterance.voice = preferredVoice;
+            utterance.lang = preferredVoice.lang;
+          } else {
+            utterance.lang = languageCode;
           }
           
           utterance.rate = 0.9;
@@ -125,8 +120,8 @@ export const speakTextWithFallback = async (text: string): Promise<boolean> => {
   return false;
 };
 
-// Enhanced speech recognition with fallback
-export const startSpeechRecognitionWithFallback = (): Promise<SpeechRecognition | null> => {
+// Enhanced speech recognition with fallback and language support
+export const startSpeechRecognitionWithFallback = (languageCode: string = 'en-US'): Promise<SpeechRecognition | null> => {
   return new Promise((resolve, reject) => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       try {
@@ -134,7 +129,7 @@ export const startSpeechRecognitionWithFallback = (): Promise<SpeechRecognition 
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = 'en-US';
+        recognition.lang = languageCode;
         resolve(recognition);
       } catch (error) {
         console.error('Speech recognition initialization failed:', error);
