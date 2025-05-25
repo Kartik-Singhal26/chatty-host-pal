@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, LogOut, Plus, Trash2, Edit } from 'lucide-react';
+import { Upload, LogOut, Plus, Trash2, Edit, Save, X } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 
 interface HotelInformation {
   id: string;
@@ -30,7 +30,12 @@ const Admin = () => {
   const [hotelData, setHotelData] = useState<HotelInformation[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<Partial<HotelInformation>>({});
   const { toast } = useToast();
+
+  // USD to INR conversion rate (you can make this dynamic if needed)
+  const USD_TO_INR = 83.5;
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -185,6 +190,61 @@ const Admin = () => {
     }
   };
 
+  const handleEdit = (item: HotelInformation) => {
+    setEditingId(item.id);
+    setEditData({
+      category: item.category,
+      item_name: item.item_name,
+      base_price: item.base_price,
+      negotiation_margin_percent: item.negotiation_margin_percent,
+      final_negotiation_limit: item.final_negotiation_limit,
+      description: item.description
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editData) return;
+
+    try {
+      const { error } = await supabase
+        .from('hotel_information')
+        .update({
+          category: editData.category,
+          item_name: editData.item_name,
+          base_price: editData.base_price,
+          negotiation_margin_percent: editData.negotiation_margin_percent,
+          final_negotiation_limit: editData.final_negotiation_limit,
+          description: editData.description,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Item Updated",
+        description: "Hotel information has been updated successfully",
+        variant: "default",
+      });
+
+      setEditingId(null);
+      setEditData({});
+      fetchHotelData();
+    } catch (error) {
+      console.error('Error updating hotel item:', error);
+      toast({
+        title: "Update Error",
+        description: "Failed to update hotel information",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditData({});
+  };
+
   const deleteHotelItem = async (id: string) => {
     try {
       const { error } = await supabase
@@ -209,6 +269,10 @@ const Admin = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const formatPriceInINR = (usdPrice: number) => {
+    return `₹${(usdPrice * USD_TO_INR).toLocaleString('en-IN')}`;
   };
 
   if (!isAuthenticated) {
@@ -280,7 +344,7 @@ const Admin = () => {
             <div className="space-y-4">
               <p className="text-gray-600">
                 Upload Excel or CSV files containing hotel information with columns: 
-                Category, Item Name, Base Price, Negotiation Margin %, Final Negotiation Limit, Description
+                Category, Item Name, Base Price (USD), Negotiation Margin %, Final Negotiation Limit (USD), Description
               </p>
               <div className="flex items-center space-x-4">
                 <Input
@@ -293,6 +357,9 @@ const Admin = () => {
                   {loading ? 'Processing...' : 'Process File'}
                 </Button>
               </div>
+              <p className="text-sm text-blue-600">
+                Note: Prices will be displayed in INR (₹) using conversion rate: 1 USD = ₹{USD_TO_INR}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -300,7 +367,7 @@ const Admin = () => {
         {/* Hotel Information Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Hotel Information Database</CardTitle>
+            <CardTitle>Hotel Information Database (Prices in INR)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -309,9 +376,9 @@ const Admin = () => {
                   <TableRow>
                     <TableHead>Category</TableHead>
                     <TableHead>Item Name</TableHead>
-                    <TableHead>Base Price</TableHead>
+                    <TableHead>Base Price (INR)</TableHead>
                     <TableHead>Margin %</TableHead>
-                    <TableHead>Min Price</TableHead>
+                    <TableHead>Min Price (INR)</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -319,21 +386,116 @@ const Admin = () => {
                 <TableBody>
                   {hotelData.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.category}</TableCell>
-                      <TableCell>{item.item_name}</TableCell>
-                      <TableCell>${item.base_price}</TableCell>
-                      <TableCell>{item.negotiation_margin_percent}%</TableCell>
-                      <TableCell>${item.final_negotiation_limit}</TableCell>
-                      <TableCell className="max-w-xs truncate">{item.description}</TableCell>
+                      <TableCell className="font-medium">
+                        {editingId === item.id ? (
+                          <Input
+                            value={editData.category || ''}
+                            onChange={(e) => setEditData({...editData, category: e.target.value})}
+                            className="min-w-[120px]"
+                          />
+                        ) : (
+                          item.category
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === item.id ? (
+                          <Input
+                            value={editData.item_name || ''}
+                            onChange={(e) => setEditData({...editData, item_name: e.target.value})}
+                            className="min-w-[150px]"
+                          />
+                        ) : (
+                          item.item_name
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === item.id ? (
+                          <Input
+                            type="number"
+                            value={editData.base_price || ''}
+                            onChange={(e) => setEditData({...editData, base_price: parseFloat(e.target.value)})}
+                            className="min-w-[100px]"
+                            placeholder="USD"
+                          />
+                        ) : (
+                          formatPriceInINR(item.base_price)
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === item.id ? (
+                          <Input
+                            type="number"
+                            value={editData.negotiation_margin_percent || ''}
+                            onChange={(e) => setEditData({...editData, negotiation_margin_percent: parseFloat(e.target.value)})}
+                            className="min-w-[80px]"
+                          />
+                        ) : (
+                          `${item.negotiation_margin_percent}%`
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === item.id ? (
+                          <Input
+                            type="number"
+                            value={editData.final_negotiation_limit || ''}
+                            onChange={(e) => setEditData({...editData, final_negotiation_limit: parseFloat(e.target.value)})}
+                            className="min-w-[100px]"
+                            placeholder="USD"
+                          />
+                        ) : (
+                          formatPriceInINR(item.final_negotiation_limit)
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        {editingId === item.id ? (
+                          <Textarea
+                            value={editData.description || ''}
+                            onChange={(e) => setEditData({...editData, description: e.target.value})}
+                            className="min-w-[200px] min-h-[60px]"
+                          />
+                        ) : (
+                          <div className="truncate" title={item.description}>
+                            {item.description}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteHotelItem(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {editingId === item.id ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={handleSaveEdit}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelEdit}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEdit(item)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteHotelItem(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
