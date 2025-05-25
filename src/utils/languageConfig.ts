@@ -10,7 +10,8 @@ export interface Language {
 export type VoiceGender = 'female' | 'male';
 
 export const SUPPORTED_LANGUAGES: Language[] = [
-  { code: 'en', name: 'English', speechCode: 'en-IN', flag: '🇮🇳', nativeName: 'English' },
+  { code: 'en', name: 'English', speechCode: 'en-US', flag: '🇺🇸', nativeName: 'English' },
+  { code: 'en-in', name: 'English (India)', speechCode: 'en-IN', flag: '🇮🇳', nativeName: 'English (India)' },
   { code: 'hi', name: 'Hindi', speechCode: 'hi-IN', flag: '🇮🇳', nativeName: 'हिन्दी' },
   { code: 'bn', name: 'Bengali', speechCode: 'bn-IN', flag: '🇮🇳', nativeName: 'বাংলা' },
   { code: 'te', name: 'Telugu', speechCode: 'te-IN', flag: '🇮🇳', nativeName: 'తెలుగు' },

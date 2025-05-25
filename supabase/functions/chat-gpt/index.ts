@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
@@ -191,7 +192,7 @@ serve(async (req) => {
 
     console.log('Processing request for session:', sessionId);
 
-    // Get hotel pricing data for discount calculations
+    // Get hotel pricing data for strict price adherence
     const hotelData = await getHotelPricingData();
     console.log('Loaded hotel data:', hotelData.length, 'items');
 
@@ -199,8 +200,22 @@ serve(async (req) => {
     const relevantKnowledge = await findRelevantKnowledge(userInput);
     console.log('Found relevant knowledge:', relevantKnowledge.length, 'items');
 
-    // Build enhanced system prompt with knowledge and pricing data
+    // Build enhanced system prompt with STRICT pricing guidelines
     let systemPrompt = `You are Elena, a sophisticated and professional hospitality assistant for a luxury hotel. You have an elegant, warm, and refined speaking style that reflects exceptional service standards.
+
+CRITICAL PRICING RULES - MUST BE FOLLOWED EXACTLY:
+1. NEVER deviate from the exact prices listed in the hotel database
+2. You can ONLY offer discounts within the specified margin limits for each item
+3. Always quote prices in Indian Rupees (₹) with proper formatting
+4. When calculating discounts, ensure the final price never goes below the final_negotiation_limit
+5. Always aim to maximize profit while securing the booking
+6. If a customer requests a discount beyond the allowed margin, politely explain our pricing structure
+
+DISCOUNT CALCULATION RULES:
+- Base Price: The standard rate (never go above this without justification)
+- Maximum Discount: Limited by negotiation_margin_percent in database
+- Final Negotiation Limit: Absolute minimum price (never go below this)
+- Always show: Original Price → Discounted Price (if applicable)
 
 Key personality traits:
 - Speak with the grace and professionalism of a luxury hotel concierge
@@ -208,24 +223,19 @@ Key personality traits:
 - Show genuine care and attention to detail in every response
 - Maintain a confident yet humble demeanor
 - Keep responses concise and to the point - avoid overly long explanations
-
-IMPORTANT PRICING GUIDELINES:
-- All prices are in Indian Rupees (INR) and should be displayed with ₹ symbol
-- When guests ask about discounts, calculate optimal pricing that maximizes profit while keeping customers satisfied
-- Always offer realistic discounts within the available margin
-- Focus on value proposition rather than just price cuts
+- Always justify pricing decisions with value propositions
 
 You can help guests with:
-- Room service orders and dining recommendations  
-- Hotel amenities and services information
+- Room service orders and dining recommendations with exact pricing
+- Hotel amenities and services information with accurate costs
 - Local attractions and recommendations
-- Concierge services and pricing with appropriate discounts
-- Housekeeping requests
+- Concierge services with competitive but profitable pricing
+- Housekeeping requests with proper rates
 - Check-in/check-out assistance
-- Spa and wellness bookings with competitive pricing
-- Transportation arrangements
+- Spa and wellness bookings with database-accurate pricing
+- Transportation arrangements with correct fare calculations
 
-Always speak as if you're a knowledgeable, experienced hospitality professional who takes pride in providing exceptional service while ensuring hotel profitability.`;
+MANDATORY: When discussing any service with pricing, you MUST reference the database prices exactly and only offer discounts within the allowed margins.`;
 
     if (relevantKnowledge.length > 0) {
       systemPrompt += '\n\nRelevant hotel knowledge for this conversation:\n';
@@ -234,25 +244,33 @@ Always speak as if you're a knowledgeable, experienced hospitality professional 
       });
     }
 
-    // Add pricing context for discount requests
-    if (hotelData.length > 0 && (userInput.toLowerCase().includes('discount') || userInput.toLowerCase().includes('price') || userInput.toLowerCase().includes('cost') || userInput.toLowerCase().includes('डिस्काउंट') || userInput.toLowerCase().includes('कीमत'))) {
-      systemPrompt += '\n\nCurrent Hotel Pricing Information (All prices in INR):\n';
+    // Add STRICT pricing context when pricing is mentioned
+    if (hotelData.length > 0 && (userInput.toLowerCase().includes('discount') || userInput.toLowerCase().includes('price') || userInput.toLowerCase().includes('cost') || userInput.toLowerCase().includes('rate') || userInput.toLowerCase().includes('charge') || userInput.toLowerCase().includes('डिस्काउंट') || userInput.toLowerCase().includes('कीमत'))) {
+      systemPrompt += '\n\nHOTEL PRICING DATABASE (ALL PRICES ARE FINAL - FOLLOW EXACTLY):\n';
       
       hotelData.forEach(item => {
-        const pricing = calculateOptimalDiscount(item);
-        systemPrompt += `- ${item.category} - ${item.item_name}: Base Price ₹${item.base_price.toLocaleString('en-IN')}`;
+        const maxDiscountAmount = (item.base_price * item.negotiation_margin_percent) / 100;
+        const minSellingPrice = item.base_price - maxDiscountAmount;
         
-        if (pricing.canOfferDiscount) {
-          systemPrompt += `, Can offer up to ${pricing.maxDiscountPercent.toFixed(1)}% discount (₹${pricing.discountedPrice.toLocaleString('en-IN')})`;
-        }
-        systemPrompt += `\n`;
+        systemPrompt += `\n${item.category} - ${item.item_name}:
+- Base Price: ₹${item.base_price.toLocaleString('en-IN')} (STANDARD RATE)
+- Maximum Discount Allowed: ${item.negotiation_margin_percent}% (₹${maxDiscountAmount.toLocaleString('en-IN')})
+- Minimum Selling Price: ₹${minSellingPrice.toLocaleString('en-IN')}
+- Final Negotiation Limit: ₹${item.final_negotiation_limit.toLocaleString('en-IN')} (NEVER GO BELOW)
+- Description: ${item.description}
+`;
       });
       
-      systemPrompt += '\nWhen discussing pricing:\n';
-      systemPrompt += '- Always mention prices in INR with ₹ symbol\n';
-      systemPrompt += '- Offer reasonable discounts that maintain profitability\n';
-      systemPrompt += '- Emphasize value and quality of services\n';
-      systemPrompt += '- Be helpful but ensure hotel maintains good profit margins\n';
+      systemPrompt += '\n\nPRICING GUIDELINES (MANDATORY):
+1. Quote Base Price first, then mention available discounts if asked
+2. Calculate discounts ONLY within the allowed margin
+3. Never quote below the Final Negotiation Limit
+4. Show calculations: "Base Price ₹X, with Y% discount = ₹Z"
+5. Emphasize value and quality to justify pricing
+6. If customer requests higher discount, explain margin limitations professionally
+7. Always aim for maximum profit while securing the booking
+8. Use phrases like "Our best available rate" or "Special discounted price of"
+';
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -273,8 +291,8 @@ Always speak as if you're a knowledgeable, experienced hospitality professional 
             content: userInput
           }
         ],
-        temperature: 0.7,
-        max_tokens: 250, // Reduced for more concise responses
+        temperature: 0.3, // Lower temperature for more consistent pricing
+        max_tokens: 300, // Increased slightly for detailed pricing explanations
       }),
     });
 

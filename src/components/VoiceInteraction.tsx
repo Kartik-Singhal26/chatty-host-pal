@@ -13,6 +13,7 @@ import {
 } from '@/utils/audioFallback';
 import { SUPPORTED_LANGUAGES, Language, getLanguageByCode, VoiceGender } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
+import VoiceGenderSelector from '@/components/VoiceGenderSelector';
 
 interface Message {
   id: string;
@@ -32,7 +33,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]); // Now defaults to English
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
   const [selectedGender, setSelectedGender] = useState<VoiceGender>('female');
   const [autoLanguageDetection, setAutoLanguageDetection] = useState(true);
   
@@ -45,17 +46,16 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
     
-    // Set default language based on browser preference (will default to English)
-    const preferredLangCode = getBrowserPreferredIndianLanguage();
-    const preferredLanguage = getLanguageByCode(preferredLangCode) || SUPPORTED_LANGUAGES[0];
-    setSelectedLanguage(preferredLanguage);
+    // Set default language to English
+    const englishLanguage = getLanguageByCode('en') || SUPPORTED_LANGUAGES[0];
+    setSelectedLanguage(englishLanguage);
     
     // Initialize audio
     enableAutoplay();
     
     console.log('🚀 VoiceInteraction initialized:', { 
       sessionId: newSessionId, 
-      language: preferredLanguage?.name
+      language: englishLanguage?.name
     });
   }, [toast]);
 
@@ -242,17 +242,47 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     console.log(`🗣️ AI starting to speak in ${language.nativeName} with ${selectedGender} voice`);
     
     try {
-      const speechCode = `${languageCode}-IN`;
-      const success = await speakTextWithFallback(text, speechCode, selectedGender);
+      // Split text into smaller chunks to prevent audio cutoff
+      const maxChunkLength = 150;
+      const textChunks = [];
       
-      if (!success) {
-        console.warn('⚠️ TTS failed, but continuing...');
-        toast({
-          title: "Audio Issue",
-          description: "Speech synthesis had an issue, but message was processed",
-          variant: "default",
-        });
+      // Split by sentences first
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      
+      let currentChunk = '';
+      for (const sentence of sentences) {
+        if (currentChunk.length + sentence.length > maxChunkLength && currentChunk.length > 0) {
+          textChunks.push(currentChunk.trim());
+          currentChunk = sentence.trim();
+        } else {
+          currentChunk += (currentChunk ? '. ' : '') + sentence.trim();
+        }
       }
+      
+      if (currentChunk.trim()) {
+        textChunks.push(currentChunk.trim());
+      }
+
+      console.log(`📝 Speaking in ${textChunks.length} chunks`);
+
+      // Speak each chunk sequentially
+      for (let i = 0; i < textChunks.length; i++) {
+        const chunk = textChunks[i];
+        console.log(`🗣️ Speaking chunk ${i + 1}/${textChunks.length}: "${chunk.substring(0, 50)}..."`);
+        
+        const speechCode = `${languageCode}-IN`;
+        const success = await speakTextWithFallback(chunk, speechCode, selectedGender);
+        
+        if (!success) {
+          console.warn(`⚠️ TTS failed for chunk ${i + 1}, continuing...`);
+        }
+        
+        // Small delay between chunks to ensure proper sequencing
+        if (i < textChunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+      
     } catch (error) {
       console.error('💥 Speech synthesis error:', error);
       toast({
@@ -262,7 +292,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       });
     } finally {
       setIsSpeaking(false);
-      console.log('🔇 AI finished speaking');
+      console.log('🔇 AI finished speaking all chunks');
     }
   };
 
@@ -308,11 +338,15 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
-      {/* Language Selector and Auto Detection Toggle */}
+      {/* Language and Voice Controls */}
       <div className="flex justify-center items-center gap-4 flex-wrap">
         <LanguageSelector
           selectedLanguage={selectedLanguage}
           onLanguageChange={handleLanguageChange}
+        />
+        <VoiceGenderSelector
+          selectedGender={selectedGender}
+          onGenderChange={setSelectedGender}
         />
         <Button
           variant={autoLanguageDetection ? "default" : "outline"}
