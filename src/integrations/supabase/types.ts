@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          id: string
+          last_login: string | null
+          password_hash: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_login?: string | null
+          password_hash: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_login?: string | null
+          password_hash?: string
+          username?: string
+        }
+        Relationships: []
+      }
       chat_sessions: {
         Row: {
           created_at: string
@@ -33,6 +57,48 @@ export type Database = {
           interaction_count?: number | null
           last_activity?: string
           session_id?: string
+        }
+        Relationships: []
+      }
+      hotel_information: {
+        Row: {
+          base_price: number | null
+          category: string
+          created_at: string
+          description: string | null
+          final_negotiation_limit: number | null
+          id: string
+          is_active: boolean | null
+          item_name: string
+          negotiation_margin_percent: number | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          base_price?: number | null
+          category: string
+          created_at?: string
+          description?: string | null
+          final_negotiation_limit?: number | null
+          id?: string
+          is_active?: boolean | null
+          item_name: string
+          negotiation_margin_percent?: number | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          base_price?: number | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          final_negotiation_limit?: number | null
+          id?: string
+          is_active?: boolean | null
+          item_name?: string
+          negotiation_margin_percent?: number | null
+          updated_at?: string
+          uploaded_by?: string | null
         }
         Relationships: []
       }
@@ -66,6 +132,36 @@ export type Database = {
           response_template?: string | null
           updated_at?: string
           usage_count?: number | null
+        }
+        Relationships: []
+      }
+      uploaded_files: {
+        Row: {
+          file_type: string | null
+          filename: string
+          id: string
+          records_imported: number | null
+          status: string | null
+          upload_date: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          file_type?: string | null
+          filename: string
+          id?: string
+          records_imported?: number | null
+          status?: string | null
+          upload_date?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          file_type?: string | null
+          filename?: string
+          id?: string
+          records_imported?: number | null
+          status?: string | null
+          upload_date?: string
+          uploaded_by?: string | null
         }
         Relationships: []
       }
