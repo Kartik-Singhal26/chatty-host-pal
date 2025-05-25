@@ -221,7 +221,7 @@ STRICT RESPONSE REQUIREMENTS:
 `;
       });
       
-      systemPrompt += '\n\nABSOLUTE MANDATORY PRICING GUIDELINES (NO EXCEPTIONS):
+      systemPrompt += `\n\nABSOLUTE MANDATORY PRICING GUIDELINES (NO EXCEPTIONS):
 1. Quote Base Price first, then mention available discounts if asked
 2. Calculate discounts ONLY within the allowed margin - NO EXCEPTIONS
 3. NEVER quote below the Final Negotiation Limit - this is ABSOLUTE
@@ -231,8 +231,7 @@ STRICT RESPONSE REQUIREMENTS:
 7. Always aim for maximum profit while securing booking within allowed margins
 8. Use Indian Rupee formatting with commas: ₹1,50,000 not ₹150000
 9. Be specific, consistent, and never contradict previous statements
-10. Remember all previous responses in this conversation
-';
+10. Remember all previous responses in this conversation`;
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
