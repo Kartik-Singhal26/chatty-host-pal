@@ -60,6 +60,36 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_memory: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          message_order: number
+          role: string
+          session_id: string
+          timestamp: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          message_order: number
+          role: string
+          session_id: string
+          timestamp?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          message_order?: number
+          role?: string
+          session_id?: string
+          timestamp?: string
+        }
+        Relationships: []
+      }
       hotel_information: {
         Row: {
           base_price: number | null

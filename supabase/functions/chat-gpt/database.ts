@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
 export interface KnowledgeItem {
@@ -20,11 +19,73 @@ export interface HotelInformation {
   is_active: boolean;
 }
 
+export interface ConversationMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  message_order: number;
+}
+
 export class DatabaseService {
   private supabase;
 
   constructor(supabaseUrl: string, supabaseServiceKey: string) {
     this.supabase = createClient(supabaseUrl, supabaseServiceKey);
+  }
+
+  async getConversationHistory(sessionId: string): Promise<ConversationMessage[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('conversation_memory')
+        .select('role, content, message_order')
+        .eq('session_id', sessionId)
+        .order('message_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching conversation history:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getConversationHistory:', error);
+      return [];
+    }
+  }
+
+  async saveConversationMessage(sessionId: string, role: string, content: string, messageOrder: number) {
+    try {
+      await this.supabase
+        .from('conversation_memory')
+        .insert({
+          session_id: sessionId,
+          role: role,
+          content: content,
+          message_order: messageOrder
+        });
+    } catch (error) {
+      console.error('Error saving conversation message:', error);
+    }
+  }
+
+  async getNextMessageOrder(sessionId: string): Promise<number> {
+    try {
+      const { data, error } = await this.supabase
+        .from('conversation_memory')
+        .select('message_order')
+        .eq('session_id', sessionId)
+        .order('message_order', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error getting last message order:', error);
+        return 1;
+      }
+
+      return data && data.length > 0 ? data[0].message_order + 1 : 1;
+    } catch (error) {
+      console.error('Error in getNextMessageOrder:', error);
+      return 1;
+    }
   }
 
   async getHotelPricingData(): Promise<HotelInformation[]> {

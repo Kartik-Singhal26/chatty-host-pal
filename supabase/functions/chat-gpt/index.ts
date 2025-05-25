@@ -29,6 +29,10 @@ serve(async (req) => {
     const openAIService = new OpenAIService(openAIApiKey);
     const promptBuilder = new PromptBuilder();
 
+    // Get conversation history
+    const conversationHistory = await dbService.getConversationHistory(sessionId);
+    console.log('Loaded conversation history:', conversationHistory.length, 'messages');
+
     // Get hotel pricing data for STRICT price adherence
     const hotelData = await dbService.getHotelPricingData();
     console.log('Loaded hotel data:', hotelData.length, 'items');
@@ -40,27 +44,41 @@ serve(async (req) => {
     // Build enhanced system prompt with ABSOLUTE STRICT pricing guidelines
     const systemPrompt = promptBuilder.buildSystemPrompt(relevantKnowledge, hotelData, userInput);
 
-    // Generate AI response
-    const assistantResponse = await openAIService.generateResponse(systemPrompt, userInput);
+    // Convert conversation history to OpenAI format
+    const chatHistory = conversationHistory.map(msg => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content
+    }));
+
+    // Generate AI response with conversation context
+    const assistantResponse = await openAIService.generateResponse(systemPrompt, userInput, chatHistory);
     const responseTime = Date.now() - startTime;
 
-    // Track knowledge usage
-    const usedPromptKeys = relevantKnowledge.map(item => item.prompt_key);
-    
-    // Save interaction and update session in background
+    // Get next message order for this session
+    const nextMessageOrder = await dbService.getNextMessageOrder(sessionId);
+
+    // Save conversation messages in background
     Promise.all([
-      dbService.saveInteraction(sessionId, userInput, assistantResponse, responseTime, usedPromptKeys),
-      dbService.updateKnowledgeUsage(usedPromptKeys),
+      // Save user message
+      dbService.saveConversationMessage(sessionId, 'user', userInput, nextMessageOrder),
+      // Save assistant response
+      dbService.saveConversationMessage(sessionId, 'assistant', assistantResponse, nextMessageOrder + 1),
+      // Track knowledge usage
+      dbService.updateKnowledgeUsage(relevantKnowledge.map(item => item.prompt_key)),
+      // Save interaction
+      dbService.saveInteraction(sessionId, userInput, assistantResponse, responseTime, relevantKnowledge.map(item => item.prompt_key)),
+      // Update session
       dbService.updateSession(sessionId)
     ]).catch(error => console.error('Background tasks error:', error));
 
-    console.log('Response generated in', responseTime, 'ms with GPT-4o-mini');
+    console.log('Response generated in', responseTime, 'ms with GPT-4 using conversation memory');
 
     return new Response(JSON.stringify({ 
       response: assistantResponse,
       sessionId: sessionId,
-      knowledgeUsed: usedPromptKeys.length,
-      model: 'gpt-4o-mini'
+      knowledgeUsed: relevantKnowledge.length,
+      conversationLength: conversationHistory.length + 2, // +2 for current user and assistant messages
+      model: 'gpt-4'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
