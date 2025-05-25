@@ -190,6 +190,32 @@ const Admin = () => {
     }
   };
 
+  const calculateRelatedValues = (field: string, value: number, currentData: Partial<HotelInformation>) => {
+    const updated = { ...currentData };
+    
+    if (field === 'base_price') {
+      updated.base_price = value;
+      if (updated.negotiation_margin_percent) {
+        const marginAmount = (value * updated.negotiation_margin_percent) / 100;
+        updated.final_negotiation_limit = value - marginAmount;
+      }
+    } else if (field === 'negotiation_margin_percent') {
+      updated.negotiation_margin_percent = value;
+      if (updated.base_price) {
+        const marginAmount = (updated.base_price * value) / 100;
+        updated.final_negotiation_limit = updated.base_price - marginAmount;
+      }
+    } else if (field === 'final_negotiation_limit') {
+      updated.final_negotiation_limit = value;
+      if (updated.base_price && updated.base_price > 0) {
+        const marginAmount = updated.base_price - value;
+        updated.negotiation_margin_percent = (marginAmount / updated.base_price) * 100;
+      }
+    }
+    
+    return updated;
+  };
+
   const handleEdit = (item: HotelInformation) => {
     setEditingId(item.id);
     setEditData({
@@ -200,6 +226,18 @@ const Admin = () => {
       final_negotiation_limit: item.final_negotiation_limit,
       description: item.description
     });
+  };
+
+  const handleEditFieldChange = (field: string, value: string | number) => {
+    if (field === 'base_price' || field === 'negotiation_margin_percent' || field === 'final_negotiation_limit') {
+      const numValue = typeof value === 'string' ? parseFloat(value) : value;
+      if (!isNaN(numValue)) {
+        const updatedData = calculateRelatedValues(field, numValue, editData);
+        setEditData(updatedData);
+      }
+    } else {
+      setEditData({...editData, [field]: value});
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -378,7 +416,7 @@ const Admin = () => {
                     <TableHead>Item Name</TableHead>
                     <TableHead>Base Price (INR)</TableHead>
                     <TableHead>Margin %</TableHead>
-                    <TableHead>Min Price (INR)</TableHead>
+                    <TableHead>Min Selling Price (INR)</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -390,7 +428,7 @@ const Admin = () => {
                         {editingId === item.id ? (
                           <Input
                             value={editData.category || ''}
-                            onChange={(e) => setEditData({...editData, category: e.target.value})}
+                            onChange={(e) => handleEditFieldChange('category', e.target.value)}
                             className="min-w-[120px]"
                           />
                         ) : (
@@ -401,7 +439,7 @@ const Admin = () => {
                         {editingId === item.id ? (
                           <Input
                             value={editData.item_name || ''}
-                            onChange={(e) => setEditData({...editData, item_name: e.target.value})}
+                            onChange={(e) => handleEditFieldChange('item_name', e.target.value)}
                             className="min-w-[150px]"
                           />
                         ) : (
@@ -413,9 +451,10 @@ const Admin = () => {
                           <Input
                             type="number"
                             value={editData.base_price || ''}
-                            onChange={(e) => setEditData({...editData, base_price: parseFloat(e.target.value)})}
+                            onChange={(e) => handleEditFieldChange('base_price', e.target.value)}
                             className="min-w-[100px]"
                             placeholder="USD"
+                            step="0.01"
                           />
                         ) : (
                           formatPriceInINR(item.base_price)
@@ -425,9 +464,10 @@ const Admin = () => {
                         {editingId === item.id ? (
                           <Input
                             type="number"
-                            value={editData.negotiation_margin_percent || ''}
-                            onChange={(e) => setEditData({...editData, negotiation_margin_percent: parseFloat(e.target.value)})}
+                            value={editData.negotiation_margin_percent?.toFixed(2) || ''}
+                            onChange={(e) => handleEditFieldChange('negotiation_margin_percent', e.target.value)}
                             className="min-w-[80px]"
+                            step="0.01"
                           />
                         ) : (
                           `${item.negotiation_margin_percent}%`
@@ -437,10 +477,11 @@ const Admin = () => {
                         {editingId === item.id ? (
                           <Input
                             type="number"
-                            value={editData.final_negotiation_limit || ''}
-                            onChange={(e) => setEditData({...editData, final_negotiation_limit: parseFloat(e.target.value)})}
+                            value={editData.final_negotiation_limit?.toFixed(2) || ''}
+                            onChange={(e) => handleEditFieldChange('final_negotiation_limit', e.target.value)}
                             className="min-w-[100px]"
                             placeholder="USD"
+                            step="0.01"
                           />
                         ) : (
                           formatPriceInINR(item.final_negotiation_limit)
@@ -450,7 +491,7 @@ const Admin = () => {
                         {editingId === item.id ? (
                           <Textarea
                             value={editData.description || ''}
-                            onChange={(e) => setEditData({...editData, description: e.target.value})}
+                            onChange={(e) => handleEditFieldChange('description', e.target.value)}
                             className="min-w-[200px] min-h-[60px]"
                           />
                         ) : (
