@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,9 +34,6 @@ const Admin = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<HotelInformation>>({});
   const { toast } = useToast();
-
-  // USD to INR conversion rate (you can make this dynamic if needed)
-  const USD_TO_INR = 83.5;
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -309,8 +307,13 @@ const Admin = () => {
     }
   };
 
-  const formatPriceInINR = (usdPrice: number) => {
-    return `₹${(usdPrice * USD_TO_INR).toLocaleString('en-IN')}`;
+  const formatPriceInINR = (inrPrice: number) => {
+    return `₹${inrPrice.toLocaleString('en-IN')}`;
+  };
+
+  const calculateMinSellingPrice = (basePrice: number, marginPercent: number) => {
+    const marginAmount = (basePrice * marginPercent) / 100;
+    return basePrice - marginAmount;
   };
 
   if (!isAuthenticated) {
@@ -382,7 +385,7 @@ const Admin = () => {
             <div className="space-y-4">
               <p className="text-gray-600">
                 Upload Excel or CSV files containing hotel information with columns: 
-                Category, Item Name, Base Price (USD), Negotiation Margin %, Final Negotiation Limit (USD), Description
+                Category, Item Name, Base Price (INR), Negotiation Margin %, Final Negotiation Limit (INR), Description
               </p>
               <div className="flex items-center space-x-4">
                 <Input
@@ -396,7 +399,7 @@ const Admin = () => {
                 </Button>
               </div>
               <p className="text-sm text-blue-600">
-                Note: Prices will be displayed in INR (₹) using conversion rate: 1 USD = ₹{USD_TO_INR}
+                Note: All prices should be entered in Indian Rupees (INR). The system stores and displays all values in INR.
               </p>
             </div>
           </CardContent>
@@ -405,7 +408,7 @@ const Admin = () => {
         {/* Hotel Information Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Hotel Information Database (Prices in INR)</CardTitle>
+            <CardTitle>Hotel Information Database (All Prices in INR)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -417,6 +420,7 @@ const Admin = () => {
                     <TableHead>Base Price (INR)</TableHead>
                     <TableHead>Margin %</TableHead>
                     <TableHead>Min Selling Price (INR)</TableHead>
+                    <TableHead>Final Negotiation Limit (INR)</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -453,7 +457,7 @@ const Admin = () => {
                             value={editData.base_price || ''}
                             onChange={(e) => handleEditFieldChange('base_price', e.target.value)}
                             className="min-w-[100px]"
-                            placeholder="USD"
+                            placeholder="INR"
                             step="0.01"
                           />
                         ) : (
@@ -475,12 +479,23 @@ const Admin = () => {
                       </TableCell>
                       <TableCell>
                         {editingId === item.id ? (
+                          <div className="text-sm text-gray-600 min-w-[100px]">
+                            {editData.base_price && editData.negotiation_margin_percent ? 
+                              formatPriceInINR(calculateMinSellingPrice(editData.base_price, editData.negotiation_margin_percent)) : 
+                              'Calculating...'}
+                          </div>
+                        ) : (
+                          formatPriceInINR(calculateMinSellingPrice(item.base_price, item.negotiation_margin_percent))
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === item.id ? (
                           <Input
                             type="number"
                             value={editData.final_negotiation_limit?.toFixed(2) || ''}
                             onChange={(e) => handleEditFieldChange('final_negotiation_limit', e.target.value)}
                             className="min-w-[100px]"
-                            placeholder="USD"
+                            placeholder="INR"
                             step="0.01"
                           />
                         ) : (
