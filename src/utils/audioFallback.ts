@@ -112,113 +112,193 @@ const callAndroidTTS = (text: string, languageCode: string): boolean => {
   }
 };
 
-// Enhanced speech synthesis with text chunking for better performance
-export const speakTextWithFallback = async (text: string, languageCode: string = 'hi-IN', preferredGender: 'female' | 'male' = 'female'): Promise<boolean> => {
+// Improved text chunking to prevent audio cutoffs
+const splitTextIntoChunks = (text: string, maxLength: number = 150): string[] => {
+  const chunks: string[] = [];
+  
+  // First split by sentences (multiple delimiters for different languages)
+  const sentences = text.split(/[।.!?।؟]+/).filter(s => s.trim().length > 0);
+  
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    const trimmedSentence = sentence.trim();
+    
+    // If adding this sentence won't exceed limit, add it
+    if (currentChunk.length + trimmedSentence.length + 2 <= maxLength) {
+      currentChunk += (currentChunk ? '. ' : '') + trimmedSentence;
+    } else {
+      // Save current chunk if it exists
+      if (currentChunk) {
+        chunks.push(currentChunk);
+      }
+      
+      // If single sentence is too long, split by words
+      if (trimmedSentence.length > maxLength) {
+        const words = trimmedSentence.split(/\s+/);
+        let wordChunk = '';
+        
+        for (const word of words) {
+          if (wordChunk.length + word.length + 1 <= maxLength) {
+            wordChunk += (wordChunk ? ' ' : '') + word;
+          } else {
+            if (wordChunk) {
+              chunks.push(wordChunk);
+            }
+            wordChunk = word;
+          }
+        }
+        
+        if (wordChunk) {
+          currentChunk = wordChunk;
+        } else {
+          currentChunk = '';
+        }
+      } else {
+        currentChunk = trimmedSentence;
+      }
+    }
+  }
+  
+  // Add final chunk
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+  
+  return chunks.length > 0 ? chunks : [text];
+};
+
+// Enhanced speech synthesis with better error handling and chunk management
+export const speakTextWithFallback = async (text: string, languageCode: string = 'en-IN', preferredGender: 'female' | 'male' = 'female'): Promise<boolean> => {
   // Enable autoplay capabilities
   await enableAutoplay();
 
-  console.log(`Attempting to speak: "${text}" in language: ${languageCode} with ${preferredGender} voice`);
+  console.log(`🗣️ Starting TTS for: "${text}" (${languageCode}, ${preferredGender})`);
 
   // Primary: Try native Android TTS for WebView/APK
   if (isWebView() || isAndroid()) {
     const nativeSuccess = callAndroidTTS(text, languageCode);
     if (nativeSuccess) {
+      console.log('✅ Native Android TTS successful');
       return true;
     }
   }
 
-  // Secondary: Web Speech API with text chunking for long messages
+  // Secondary: Web Speech API with improved chunking
   if ('speechSynthesis' in window) {
     try {
       // Cancel any ongoing speech
       speechSynthesis.cancel();
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay after cancel
       
-      // Split long text into smaller chunks for better reliability
-      const textChunks = splitTextIntoChunks(text, 200); // 200 characters per chunk
+      // Split text into optimal chunks
+      const textChunks = splitTextIntoChunks(text, 150);
+      console.log(`📝 Split into ${textChunks.length} chunks:`, textChunks);
       
       return new Promise((resolve) => {
         let currentChunkIndex = 0;
+        let hasErrorOccurred = false;
         
-        const speakNextChunk = () => {
-          if (currentChunkIndex >= textChunks.length) {
-            console.log('All text chunks completed');
-            resolve(true);
+        const speakNextChunk = async () => {
+          if (currentChunkIndex >= textChunks.length || hasErrorOccurred) {
+            console.log(hasErrorOccurred ? '❌ TTS completed with errors' : '✅ All chunks completed successfully');
+            resolve(!hasErrorOccurred);
             return;
           }
           
           const chunk = textChunks[currentChunkIndex];
-          console.log(`Speaking chunk ${currentChunkIndex + 1}/${textChunks.length}: "${chunk}"`);
+          console.log(`🎵 Speaking chunk ${currentChunkIndex + 1}/${textChunks.length}: "${chunk}"`);
           
           const utterance = new SpeechSynthesisUtterance(chunk);
           
+          // Wait for voices to be available
           const voices = speechSynthesis.getVoices();
-          const preferredVoice = getPreferredVoice(voices, languageCode, preferredGender);
+          if (voices.length === 0) {
+            await new Promise(resolve => {
+              speechSynthesis.onvoiceschanged = () => {
+                speechSynthesis.onvoiceschanged = null;
+                resolve(void 0);
+              };
+              setTimeout(resolve, 1000); // Fallback timeout
+            });
+          }
+          
+          const finalVoices = speechSynthesis.getVoices();
+          const preferredVoice = getPreferredVoice(finalVoices, languageCode, preferredGender);
           
           if (preferredVoice) {
             utterance.voice = preferredVoice;
             utterance.lang = preferredVoice.lang;
-            console.log('Selected voice:', preferredVoice.name, preferredVoice.lang, `(${preferredGender})`);
+            console.log(`🎤 Using voice: ${preferredVoice.name} (${preferredVoice.lang})`);
           } else {
             utterance.lang = languageCode;
-            console.log('Using default voice for language:', languageCode);
+            console.log(`🎤 Using default voice for: ${languageCode}`);
           }
           
-          // Optimize for stability
-          utterance.rate = 0.8;
+          // Optimize settings for reliability
+          utterance.rate = 0.85;
           utterance.pitch = 1.0;
           utterance.volume = 1.0;
           
+          let chunkCompleted = false;
+          
           utterance.onstart = () => {
-            console.log(`Chunk ${currentChunkIndex + 1} started`);
+            console.log(`▶️ Chunk ${currentChunkIndex + 1} started`);
           };
           
           utterance.onend = () => {
-            console.log(`Chunk ${currentChunkIndex + 1} completed`);
-            currentChunkIndex++;
-            // Small delay between chunks for better stability
-            setTimeout(speakNextChunk, 300);
+            if (!chunkCompleted) {
+              chunkCompleted = true;
+              console.log(`✅ Chunk ${currentChunkIndex + 1} completed`);
+              currentChunkIndex++;
+              setTimeout(speakNextChunk, 200); // Short pause between chunks
+            }
           };
           
           utterance.onerror = (error) => {
-            console.error(`Chunk ${currentChunkIndex + 1} error:`, error);
-            currentChunkIndex++;
-            // Continue with next chunk even if current fails
-            setTimeout(speakNextChunk, 500);
+            if (!chunkCompleted) {
+              chunkCompleted = true;
+              console.error(`❌ Chunk ${currentChunkIndex + 1} error:`, error);
+              
+              // Mark error but continue with next chunk
+              if (error.error === 'interrupted' || error.error === 'canceled') {
+                hasErrorOccurred = true;
+                resolve(false);
+                return;
+              }
+              
+              currentChunkIndex++;
+              setTimeout(speakNextChunk, 300);
+            }
           };
           
-          speechSynthesis.speak(utterance);
-          
-          // Safety timeout for each chunk
-          setTimeout(() => {
-            if (speechSynthesis.speaking) {
-              console.log(`Chunk ${currentChunkIndex} timeout, moving to next`);
-              speechSynthesis.cancel();
-              currentChunkIndex++;
-              speakNextChunk();
-            }
-          }, 8000); // 8 second timeout per chunk
+          try {
+            speechSynthesis.speak(utterance);
+            
+            // Safety timeout per chunk (longer for longer chunks)
+            const timeout = Math.max(5000, chunk.length * 100); // 100ms per character, min 5s
+            setTimeout(() => {
+              if (!chunkCompleted && speechSynthesis.speaking) {
+                console.warn(`⏰ Chunk ${currentChunkIndex + 1} timeout, moving to next`);
+                speechSynthesis.cancel();
+                chunkCompleted = true;
+                currentChunkIndex++;
+                setTimeout(speakNextChunk, 300);
+              }
+            }, timeout);
+            
+          } catch (error) {
+            console.error(`💥 Error speaking chunk ${currentChunkIndex + 1}:`, error);
+            chunkCompleted = true;
+            currentChunkIndex++;
+            setTimeout(speakNextChunk, 300);
+          }
         };
 
-        // Wait for voices to load or use immediately if available
-        if (speechSynthesis.getVoices().length === 0) {
-          speechSynthesis.onvoiceschanged = () => {
-            speechSynthesis.onvoiceschanged = null;
-            speakNextChunk();
-          };
-          
-          // Timeout for voice loading
-          setTimeout(() => {
-            if (speechSynthesis.onvoiceschanged) {
-              speechSynthesis.onvoiceschanged = null;
-              speakNextChunk();
-            }
-          }, 2000);
-        } else {
-          speakNextChunk();
-        }
+        speakNextChunk();
       });
     } catch (error) {
-      console.log('Web Speech API failed:', error);
+      console.error('💥 Web Speech API failed:', error);
     }
   }
 
@@ -297,50 +377,8 @@ export const speakTextWithFallback = async (text: string, languageCode: string =
     console.log('Audio feedback failed:', error);
   }
 
-  console.log('TTS not available - text would be spoken:', text);
+  console.log('📢 TTS not available - text would be spoken:', text);
   return false;
-};
-
-// Helper function to split text into manageable chunks
-const splitTextIntoChunks = (text: string, maxLength: number): string[] => {
-  const chunks: string[] = [];
-  const sentences = text.split(/[।.!?]+/).filter(s => s.trim().length > 0);
-  
-  let currentChunk = '';
-  
-  for (const sentence of sentences) {
-    const trimmedSentence = sentence.trim();
-    
-    if (currentChunk.length + trimmedSentence.length + 1 <= maxLength) {
-      currentChunk += (currentChunk ? ' ' : '') + trimmedSentence;
-    } else {
-      if (currentChunk) {
-        chunks.push(currentChunk);
-        currentChunk = trimmedSentence;
-      } else {
-        // If single sentence is too long, split by words
-        const words = trimmedSentence.split(' ');
-        let wordChunk = '';
-        
-        for (const word of words) {
-          if (wordChunk.length + word.length + 1 <= maxLength) {
-            wordChunk += (wordChunk ? ' ' : '') + word;
-          } else {
-            if (wordChunk) chunks.push(wordChunk);
-            wordChunk = word;
-          }
-        }
-        
-        if (wordChunk) currentChunk = wordChunk;
-      }
-    }
-  }
-  
-  if (currentChunk) {
-    chunks.push(currentChunk);
-  }
-  
-  return chunks.length > 0 ? chunks : [text];
 };
 
 // Enhanced speech recognition with comprehensive language support
@@ -387,9 +425,10 @@ export const startSpeechRecognitionWithFallback = (languageCode: string = 'hi-IN
   });
 };
 
-// Enhanced language detection with comprehensive Indian language patterns
+// Enhanced language detection with English support
 export const detectLanguageFromSpeech = (transcript: string): string => {
   const languagePatterns = {
+    'en': /\b(hello|hi|thank|you|please|yes|no|good|how|are|what|where|when|why|can|will|would|should|hotel|room|service|discount|price|booking)\b/i,
     'hi': /\b(नमस्ते|नमस्कार|धन्यवाद|कृपया|हाँ|नहीं|अच्छा|क्या|कैसे|मैं|आप|यह|वह|अभी|आज|कल|सुप्रभात|शुभ|राम|राम|जय|हिंद)\b/i,
     'bn': /\b(নমস্কার|নমস্তে|ধন্যবাদ|দয়া|করে|হ্যাঁ|না|ভাল|কেমন|আছেন|আমি|আপনি|এই|সেই|আজ|কাল|সুপ্রভাত|জয়|বাংলা)\b/i,
     'te': /\b(నమస్కారం|నమస్తే|ధన్యవాదాలు|దయచేసి|అవును|లేదు|బాగుంది|ఎలా|ఉన్నారు|నేను|మీరు|ఇది|అది|ఈరోజు|రేపు|శుభోదయం|జై|తెలుగు)\b/i,
@@ -421,13 +460,13 @@ export const detectLanguageFromSpeech = (transcript: string): string => {
   const detectedLang = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b, '');
   
   if (detectedLang && scores[detectedLang] > 0) {
-    console.log(`Detected ${detectedLang} language from transcript: "${transcript}" (score: ${scores[detectedLang]})`);
+    console.log(`🔍 Detected ${detectedLang} language from transcript: "${transcript}" (score: ${scores[detectedLang]})`);
     return detectedLang;
   }
 
-  // Default to Hindi for Indian context
-  console.log(`No specific language detected from transcript: "${transcript}", defaulting to Hindi`);
-  return 'hi';
+  // Default to English for better international support
+  console.log(`🔍 No specific language detected from transcript: "${transcript}", defaulting to English`);
+  return 'en';
 };
 
 // Utility to get browser's preferred Indian language
@@ -435,16 +474,16 @@ export const getBrowserPreferredIndianLanguage = (): string => {
   const browserLang = navigator.language.toLowerCase();
   const langCode = browserLang.split('-')[0];
   
-  // Map browser language codes to our supported Indian languages
-  const supportedCodes = ['hi', 'bn', 'te', 'mr', 'ta', 'gu', 'kn', 'ml', 'pa', 'or', 'as', 'ur', 'sa', 'ne', 'si'];
+  // Map browser language codes to our supported languages
+  const supportedCodes = ['en', 'hi', 'bn', 'te', 'mr', 'ta', 'gu', 'kn', 'ml', 'pa', 'or', 'as', 'ur', 'sa', 'ne', 'si'];
   
   if (supportedCodes.includes(langCode)) {
-    console.log('Detected browser language:', langCode);
+    console.log('🌐 Detected browser language:', langCode);
     return langCode;
   }
   
-  // Default to Hindi
-  return 'hi';
+  // Default to English
+  return 'en';
 };
 
 // Create Android interface setup instructions

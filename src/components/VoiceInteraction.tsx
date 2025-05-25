@@ -32,7 +32,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]); // Now defaults to English
   const [selectedGender, setSelectedGender] = useState<VoiceGender>('female');
   const [autoLanguageDetection, setAutoLanguageDetection] = useState(true);
   
@@ -45,17 +45,15 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
     
-    // Set default language based on browser preference
+    // Set default language based on browser preference (will default to English)
     const preferredLangCode = getBrowserPreferredIndianLanguage();
-    const preferredLanguage = getLanguageByCode(preferredLangCode);
-    if (preferredLanguage) {
-      setSelectedLanguage(preferredLanguage);
-    }
+    const preferredLanguage = getLanguageByCode(preferredLangCode) || SUPPORTED_LANGUAGES[0];
+    setSelectedLanguage(preferredLanguage);
     
     // Initialize audio
     enableAutoplay();
     
-    console.log('VoiceInteraction initialized:', { 
+    console.log('🚀 VoiceInteraction initialized:', { 
       sessionId: newSessionId, 
       language: preferredLanguage?.name
     });
@@ -192,7 +190,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   const processWithChatGPT = async (userInput: string, languageCode: string = selectedLanguage.code) => {
     setIsProcessing(true);
-    console.log(`Processing with GPT-4o: "${userInput}" (Language: ${languageCode})`);
+    console.log(`🤖 Processing with GPT-4o: "${userInput}" (Language: ${languageCode})`);
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
@@ -208,6 +206,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       }
 
       const assistantResponse = data.response;
+      console.log(`💬 GPT Response: "${assistantResponse}"`);
 
       const assistantMessage: Message = {
         id: Date.now().toString(),
@@ -226,7 +225,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
       await speakText(assistantResponse, languageCode);
 
     } catch (error) {
-      console.error('ChatGPT API error:', error);
+      console.error('❌ ChatGPT API error:', error);
       toast({
         title: "Error",
         description: "Please try again",
@@ -240,16 +239,30 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const speakText = async (text: string, languageCode: string = selectedLanguage.code) => {
     setIsSpeaking(true);
     const language = getLanguageByCode(languageCode) || selectedLanguage;
-    console.log(`AI started speaking in ${language.nativeName} with ${selectedGender} voice`);
+    console.log(`🗣️ AI starting to speak in ${language.nativeName} with ${selectedGender} voice`);
     
     try {
       const speechCode = `${languageCode}-IN`;
-      await speakTextWithFallback(text, speechCode, selectedGender);
+      const success = await speakTextWithFallback(text, speechCode, selectedGender);
+      
+      if (!success) {
+        console.warn('⚠️ TTS failed, but continuing...');
+        toast({
+          title: "Audio Issue",
+          description: "Speech synthesis had an issue, but message was processed",
+          variant: "default",
+        });
+      }
     } catch (error) {
-      console.error('Speech synthesis error:', error);
+      console.error('💥 Speech synthesis error:', error);
+      toast({
+        title: "Audio Error",
+        description: "Could not play audio response",
+        variant: "destructive",
+      });
     } finally {
       setIsSpeaking(false);
-      console.log('AI finished speaking');
+      console.log('🔇 AI finished speaking');
     }
   };
 
