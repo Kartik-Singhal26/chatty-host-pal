@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, MessageCircle, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,8 @@ import {
   detectLanguageFromSpeech,
   getBrowserPreferredIndianLanguage
 } from '@/utils/audioFallback';
-import { SUPPORTED_LANGUAGES, Language, getLanguageByCode, VoiceGender } from '@/utils/languageConfig';
+import { SUPPORTED_LANGUAGES, Language, getLanguageByCode, getPreferredVoice } from '@/utils/languageConfig';
 import LanguageSelector from '@/components/LanguageSelector';
-import VoiceGenderSelector from '@/components/VoiceGenderSelector';
 
 interface Message {
   id: string;
@@ -34,7 +34,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(SUPPORTED_LANGUAGES[0]);
-  const [selectedGender, setSelectedGender] = useState<VoiceGender>('female');
   const [autoLanguageDetection, setAutoLanguageDetection] = useState(true);
   
   const recognition = useRef<SpeechRecognition | null>(null);
@@ -59,39 +58,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
     });
   }, [toast]);
 
-  // Function to detect voice gender commands
-  const detectGenderCommand = (transcript: string): VoiceGender | null => {
-    const lowerTranscript = transcript.toLowerCase();
-    
-    // English commands
-    if (lowerTranscript.includes('change to male voice') || 
-        lowerTranscript.includes('switch to male voice') ||
-        lowerTranscript.includes('use male voice')) {
-      return 'male';
-    }
-    
-    if (lowerTranscript.includes('change to female voice') || 
-        lowerTranscript.includes('switch to female voice') ||
-        lowerTranscript.includes('use female voice')) {
-      return 'female';
-    }
-
-    // Hindi commands
-    if (lowerTranscript.includes('पुरुष आवाज') || 
-        lowerTranscript.includes('मर्द की आवाज') ||
-        lowerTranscript.includes('male voice')) {
-      return 'male';
-    }
-    
-    if (lowerTranscript.includes('महिला आवाज') || 
-        lowerTranscript.includes('औरत की आवाज') ||
-        lowerTranscript.includes('female voice')) {
-      return 'female';
-    }
-
-    return null;
-  };
-
   const initializeSpeechRecognition = useCallback(async () => {
     const recognitionInstance = await startSpeechRecognitionWithFallback(selectedLanguage.speechCode);
     
@@ -113,19 +79,6 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
         const confidence = event.results[0][0].confidence;
         
         console.log(`Transcript: "${transcript}" (Confidence: ${confidence?.toFixed(2) || 'N/A'})`);
-        
-        // Check for gender commands first
-        const genderCommand = detectGenderCommand(transcript);
-        if (genderCommand) {
-          setSelectedGender(genderCommand);
-          toast({
-            title: "Voice Updated",
-            description: `Switched to ${genderCommand} voice`,
-            variant: "default",
-          });
-          console.log(`Voice gender changed to: ${genderCommand}`);
-          return; // Don't process as regular message
-        }
         
         // Auto-detect language if enabled
         let detectedLanguage = selectedLanguage;
@@ -190,7 +143,7 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   const processWithChatGPT = async (userInput: string, languageCode: string = selectedLanguage.code) => {
     setIsProcessing(true);
-    console.log(`🤖 Processing with GPT-4o: "${userInput}" (Language: ${languageCode})`);
+    console.log(`🤖 Processing with GPT-4o-mini: "${userInput}" (Language: ${languageCode})`);
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-gpt', {
@@ -239,47 +192,74 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
   const speakText = async (text: string, languageCode: string = selectedLanguage.code) => {
     setIsSpeaking(true);
     const language = getLanguageByCode(languageCode) || selectedLanguage;
-    console.log(`🗣️ AI starting to speak in ${language.nativeName} with ${selectedGender} voice`);
+    console.log(`🗣️ AI starting to speak in ${language.nativeName} with Indian accent`);
     
     try {
-      // Split text into smaller chunks to prevent audio cutoff
-      const maxChunkLength = 150;
-      const textChunks = [];
-      
-      // Split by sentences first
-      const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      
+      // Enhanced text chunking for better audio continuity
+      const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+      const chunks: string[] = [];
       let currentChunk = '';
+      const maxChunkLength = 120; // Reduced for better audio processing
+      
       for (const sentence of sentences) {
         if (currentChunk.length + sentence.length > maxChunkLength && currentChunk.length > 0) {
-          textChunks.push(currentChunk.trim());
+          chunks.push(currentChunk.trim());
           currentChunk = sentence.trim();
         } else {
-          currentChunk += (currentChunk ? '. ' : '') + sentence.trim();
+          currentChunk += (currentChunk ? ' ' : '') + sentence.trim();
         }
       }
       
       if (currentChunk.trim()) {
-        textChunks.push(currentChunk.trim());
+        chunks.push(currentChunk.trim());
       }
 
-      console.log(`📝 Speaking in ${textChunks.length} chunks`);
+      console.log(`📝 Speaking in ${chunks.length} optimized chunks`);
 
-      // Speak each chunk sequentially
-      for (let i = 0; i < textChunks.length; i++) {
-        const chunk = textChunks[i];
-        console.log(`🗣️ Speaking chunk ${i + 1}/${textChunks.length}: "${chunk.substring(0, 50)}..."`);
+      // Get all available voices and find the best Indian accent voice
+      const voices = speechSynthesis.getVoices();
+      const preferredVoice = getPreferredVoice(voices, language.speechCode, 'female');
+      
+      // Speak each chunk with enhanced error handling and timing
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`🗣️ Speaking chunk ${i + 1}/${chunks.length}: "${chunk.substring(0, 30)}..."`);
         
-        const speechCode = `${languageCode}-IN`;
-        const success = await speakTextWithFallback(chunk, speechCode, selectedGender);
+        await new Promise((resolve, reject) => {
+          const utterance = new SpeechSynthesisUtterance(chunk);
+          
+          // Configure voice for Indian accent and optimal speech
+          utterance.lang = language.speechCode;
+          utterance.rate = 0.9; // Slightly slower for clarity
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          
+          if (preferredVoice) {
+            utterance.voice = preferredVoice;
+          }
+          
+          utterance.onend = () => {
+            console.log(`✅ Completed chunk ${i + 1}`);
+            resolve(true);
+          };
+          
+          utterance.onerror = (error) => {
+            console.warn(`⚠️ TTS error for chunk ${i + 1}:`, error);
+            resolve(false); // Continue to next chunk
+          };
+          
+          // Clear any pending speech before starting new chunk
+          speechSynthesis.cancel();
+          
+          // Small delay to ensure proper sequencing
+          setTimeout(() => {
+            speechSynthesis.speak(utterance);
+          }, 100);
+        });
         
-        if (!success) {
-          console.warn(`⚠️ TTS failed for chunk ${i + 1}, continuing...`);
-        }
-        
-        // Small delay between chunks to ensure proper sequencing
-        if (i < textChunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+        // Brief pause between chunks for natural flow
+        if (i < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
       
@@ -338,15 +318,11 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
-      {/* Language and Voice Controls */}
+      {/* Language Controls - Removed Voice Gender Selector */}
       <div className="flex justify-center items-center gap-4 flex-wrap">
         <LanguageSelector
           selectedLanguage={selectedLanguage}
           onLanguageChange={handleLanguageChange}
-        />
-        <VoiceGenderSelector
-          selectedGender={selectedGender}
-          onGenderChange={setSelectedGender}
         />
         <Button
           variant={autoLanguageDetection ? "default" : "outline"}
@@ -404,20 +380,20 @@ const VoiceInteraction: React.FC<VoiceInteractionProps> = ({ onResponseGenerated
               </p>
             )}
             {isProcessing && (
-              <p className="text-gray-600 font-medium">Processing...</p>
+              <p className="text-gray-600 font-medium">Processing with GPT-4o-mini...</p>
             )}
             {isSpeaking && (
               <p className="text-black font-medium">
-                Speaking in {selectedLanguage.name} ({selectedGender} voice)...
+                Speaking in {selectedLanguage.name} with Indian accent...
               </p>
             )}
             {!isListening && !isProcessing && !isSpeaking && (
               <div>
                 <p className="text-gray-500 mb-2">
-                  Click to start voice interaction in {selectedLanguage.name} with {selectedGender} voice
+                  Click to start voice interaction in {selectedLanguage.name} with trained Indian accent
                 </p>
                 <p className="text-xs text-gray-400">
-                  Say "change to male voice" or "change to female voice" to switch voice gender
+                  Powered by GPT-4o-mini with strict pricing enforcement
                 </p>
               </div>
             )}

@@ -53,44 +53,6 @@ async function getHotelPricingData(): Promise<HotelInformation[]> {
   }
 }
 
-function calculateOptimalDiscount(hotelItem: HotelInformation, requestedDiscountPercent?: number): {
-  originalPrice: number;
-  discountedPrice: number;
-  maxDiscountPercent: number;
-  canOfferDiscount: boolean;
-  profitMargin: number;
-} {
-  const basePrice = hotelItem.base_price;
-  const maxDiscountPercent = hotelItem.negotiation_margin_percent;
-  const finalLimit = hotelItem.final_negotiation_limit;
-  
-  // Calculate minimum selling price for profit
-  const minSellingPrice = basePrice - (basePrice * maxDiscountPercent / 100);
-  
-  let discountPercent = 0;
-  let canOfferDiscount = false;
-  
-  if (requestedDiscountPercent && requestedDiscountPercent <= maxDiscountPercent) {
-    discountPercent = requestedDiscountPercent;
-    canOfferDiscount = true;
-  } else if (maxDiscountPercent > 0) {
-    // Offer a conservative discount (80% of max margin)
-    discountPercent = Math.min(maxDiscountPercent * 0.8, 15); // Cap at 15%
-    canOfferDiscount = true;
-  }
-  
-  const discountedPrice = basePrice - (basePrice * discountPercent / 100);
-  const profitMargin = ((discountedPrice - finalLimit) / discountedPrice) * 100;
-  
-  return {
-    originalPrice: basePrice,
-    discountedPrice,
-    maxDiscountPercent: discountPercent,
-    canOfferDiscount,
-    profitMargin
-  };
-}
-
 async function findRelevantKnowledge(userInput: string): Promise<KnowledgeItem[]> {
   try {
     const { data: knowledge, error } = await supabase
@@ -192,7 +154,7 @@ serve(async (req) => {
 
     console.log('Processing request for session:', sessionId);
 
-    // Get hotel pricing data for strict price adherence
+    // Get hotel pricing data for STRICT price adherence
     const hotelData = await getHotelPricingData();
     console.log('Loaded hotel data:', hotelData.length, 'items');
 
@@ -200,42 +162,40 @@ serve(async (req) => {
     const relevantKnowledge = await findRelevantKnowledge(userInput);
     console.log('Found relevant knowledge:', relevantKnowledge.length, 'items');
 
-    // Build enhanced system prompt with STRICT pricing guidelines
-    let systemPrompt = `You are Elena, a sophisticated and professional hospitality assistant for a luxury hotel. You have an elegant, warm, and refined speaking style that reflects exceptional service standards.
+    // Build enhanced system prompt with ABSOLUTE STRICT pricing guidelines
+    let systemPrompt = `You are Elena, a sophisticated and professional hospitality assistant for a luxury hotel. You have an elegant, warm, and refined speaking style with a natural Indian accent that reflects exceptional service standards.
 
-CRITICAL PRICING RULES - MUST BE FOLLOWED EXACTLY:
-1. NEVER deviate from the exact prices listed in the hotel database
-2. You can ONLY offer discounts within the specified margin limits for each item
-3. Always quote prices in Indian Rupees (₹) with proper formatting
-4. When calculating discounts, ensure the final price never goes below the final_negotiation_limit
+ABSOLUTE CRITICAL PRICING RULES - MUST BE FOLLOWED EXACTLY WITHOUT ANY EXCEPTION:
+1. NEVER EVER deviate from the exact prices listed in the hotel database
+2. You can ONLY offer discounts within the specified margin limits for each item - NO EXCEPTIONS
+3. Always quote prices in Indian Rupees (₹) with proper formatting using commas
+4. When calculating discounts, the final price MUST NEVER go below the final_negotiation_limit
 5. Always aim to maximize profit while securing the booking
-6. If a customer requests a discount beyond the allowed margin, politely explain our pricing structure
+6. If a customer requests a discount beyond the allowed margin, you MUST clearly inform them that booking at that rate is NOT POSSIBLE and politely ask them to seek alternatives
+7. Be specific and to the point - never contradict or repeat previous responses
+8. Remember and reference all prior responses in the same conversation
 
-DISCOUNT CALCULATION RULES:
-- Base Price: The standard rate (never go above this without justification)
-- Maximum Discount: Limited by negotiation_margin_percent in database
-- Final Negotiation Limit: Absolute minimum price (never go below this)
-- Always show: Original Price → Discounted Price (if applicable)
+STRICT DISCOUNT CALCULATION RULES (NO DEVIATION ALLOWED):
+- Base Price: The standard rate (this is your starting point)
+- Maximum Discount: Limited STRICTLY by negotiation_margin_percent in database
+- Final Negotiation Limit: Absolute minimum price (NEVER EVER go below this)
+- Always show calculation: "Base Price ₹X, with Y% discount = ₹Z"
+- If customer wants more discount than allowed: "I apologize, but ₹X is our absolute minimum rate for this service. Booking below this rate is not possible."
 
-Key personality traits:
-- Speak with the grace and professionalism of a luxury hotel concierge
+PERSONALITY AND COMMUNICATION:
+- Speak with natural Indian accent and moderately fast, clear speech
 - Use refined language while remaining approachable and friendly
-- Show genuine care and attention to detail in every response
-- Maintain a confident yet humble demeanor
-- Keep responses concise and to the point - avoid overly long explanations
-- Always justify pricing decisions with value propositions
+- Show genuine care and attention to detail
+- Maintain confident yet humble demeanor
+- Keep responses concise and specific
+- Always justify pricing with value propositions
+- Be consistent throughout the conversation
 
-You can help guests with:
-- Room service orders and dining recommendations with exact pricing
-- Hotel amenities and services information with accurate costs
-- Local attractions and recommendations
-- Concierge services with competitive but profitable pricing
-- Housekeeping requests with proper rates
-- Check-in/check-out assistance
-- Spa and wellness bookings with database-accurate pricing
-- Transportation arrangements with correct fare calculations
-
-MANDATORY: When discussing any service with pricing, you MUST reference the database prices exactly and only offer discounts within the allowed margins.`;
+STRICT RESPONSE REQUIREMENTS:
+- Always aim for maximum profit within allowed margins
+- Use phrases like "Our best available rate" or "Special discounted price of"
+- Never lose customers over small differences within allowed margin
+- But NEVER compromise below final negotiation limits`;
 
     if (relevantKnowledge.length > 0) {
       systemPrompt += '\n\nRelevant hotel knowledge for this conversation:\n';
@@ -244,32 +204,34 @@ MANDATORY: When discussing any service with pricing, you MUST reference the data
       });
     }
 
-    // Add STRICT pricing context when pricing is mentioned
+    // Add ABSOLUTE STRICT pricing context when pricing is mentioned
     if (hotelData.length > 0 && (userInput.toLowerCase().includes('discount') || userInput.toLowerCase().includes('price') || userInput.toLowerCase().includes('cost') || userInput.toLowerCase().includes('rate') || userInput.toLowerCase().includes('charge') || userInput.toLowerCase().includes('डिस्काउंट') || userInput.toLowerCase().includes('कीमत'))) {
-      systemPrompt += '\n\nHOTEL PRICING DATABASE (ALL PRICES ARE FINAL - FOLLOW EXACTLY):\n';
+      systemPrompt += '\n\nHOTEL PRICING DATABASE (THESE PRICES ARE ABSOLUTE - FOLLOW EXACTLY WITH NO DEVIATION):\n';
       
       hotelData.forEach(item => {
         const maxDiscountAmount = (item.base_price * item.negotiation_margin_percent) / 100;
         const minSellingPrice = item.base_price - maxDiscountAmount;
         
         systemPrompt += `\n${item.category} - ${item.item_name}:
-- Base Price: ₹${item.base_price.toLocaleString('en-IN')} (STANDARD RATE)
+- Base Price: ₹${item.base_price.toLocaleString('en-IN')} (STANDARD RATE - START HERE)
 - Maximum Discount Allowed: ${item.negotiation_margin_percent}% (₹${maxDiscountAmount.toLocaleString('en-IN')})
-- Minimum Selling Price: ₹${minSellingPrice.toLocaleString('en-IN')}
-- Final Negotiation Limit: ₹${item.final_negotiation_limit.toLocaleString('en-IN')} (NEVER GO BELOW)
+- Minimum Selling Price: ₹${minSellingPrice.toLocaleString('en-IN')} (LOWEST YOU CAN GO)
+- Final Negotiation Limit: ₹${item.final_negotiation_limit.toLocaleString('en-IN')} (ABSOLUTE FLOOR - NEVER GO BELOW)
 - Description: ${item.description}
 `;
       });
       
-      systemPrompt += '\n\nPRICING GUIDELINES (MANDATORY):
+      systemPrompt += '\n\nABSOLUTE MANDATORY PRICING GUIDELINES (NO EXCEPTIONS):
 1. Quote Base Price first, then mention available discounts if asked
-2. Calculate discounts ONLY within the allowed margin
-3. Never quote below the Final Negotiation Limit
-4. Show calculations: "Base Price ₹X, with Y% discount = ₹Z"
+2. Calculate discounts ONLY within the allowed margin - NO EXCEPTIONS
+3. NEVER quote below the Final Negotiation Limit - this is ABSOLUTE
+4. Show calculations clearly: "Base Price ₹X, with Y% discount = ₹Z"
 5. Emphasize value and quality to justify pricing
-6. If customer requests higher discount, explain margin limitations professionally
-7. Always aim for maximum profit while securing the booking
-8. Use phrases like "Our best available rate" or "Special discounted price of"
+6. If customer requests higher discount, firmly explain: "I apologize, but ₹X is our absolute minimum rate. Booking below this rate is not possible."
+7. Always aim for maximum profit while securing booking within allowed margins
+8. Use Indian Rupee formatting with commas: ₹1,50,000 not ₹150000
+9. Be specific, consistent, and never contradict previous statements
+10. Remember all previous responses in this conversation
 ';
     }
 
@@ -280,7 +242,7 @@ MANDATORY: When discussing any service with pricing, you MUST reference the data
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini', // Using GPT-4o-mini as requested
         messages: [
           {
             role: 'system',
@@ -291,8 +253,8 @@ MANDATORY: When discussing any service with pricing, you MUST reference the data
             content: userInput
           }
         ],
-        temperature: 0.3, // Lower temperature for more consistent pricing
-        max_tokens: 300, // Increased slightly for detailed pricing explanations
+        temperature: 0.2, // Lower temperature for more consistent and strict pricing adherence
+        max_tokens: 250, // Concise responses as requested
       }),
     });
 
@@ -314,12 +276,13 @@ MANDATORY: When discussing any service with pricing, you MUST reference the data
       updateSession(sessionId)
     ]).catch(error => console.error('Background tasks error:', error));
 
-    console.log('Response generated in', responseTime, 'ms');
+    console.log('Response generated in', responseTime, 'ms with GPT-4o-mini');
 
     return new Response(JSON.stringify({ 
       response: assistantResponse,
       sessionId: sessionId,
-      knowledgeUsed: usedPromptKeys.length
+      knowledgeUsed: usedPromptKeys.length,
+      model: 'gpt-4o-mini'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
