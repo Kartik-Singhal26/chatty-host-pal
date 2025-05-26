@@ -7,6 +7,9 @@ export class WakeWordDetector {
   private wakeWords = ['astrova', 'astrava', 'astrova ai'];
   private isDestroyed = false;
   private restartTimeout: number | null = null;
+  private isRestarting = false;
+  private consecutiveErrors = 0;
+  private maxConsecutiveErrors = 3;
 
   constructor(
     onWakeWordDetected: () => void,
@@ -22,6 +25,11 @@ export class WakeWordDetector {
       return false;
     }
 
+    if (this.isListening || this.isRestarting) {
+      console.log('🔄 Wake word detection already active or restarting');
+      return false;
+    }
+
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       this.onError('Wake word detection not supported in this browser');
       return false;
@@ -31,6 +39,12 @@ export class WakeWordDetector {
     if (this.restartTimeout) {
       window.clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
+    }
+
+    // Prevent too many consecutive errors
+    if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+      console.log('🚫 Too many consecutive errors, stopping wake word detection');
+      return false;
     }
 
     try {
@@ -46,34 +60,42 @@ export class WakeWordDetector {
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = 'en-US';
-      this.recognition.maxAlternatives = 3;
+      this.recognition.maxAlternatives = 1;
 
       this.recognition.onstart = () => {
         if (this.isDestroyed) return;
         this.isListening = true;
-        console.log('🎤 Wake word detection started');
+        this.isRestarting = false;
+        this.consecutiveErrors = 0;
+        console.log('🎤 Wake word detection started successfully');
       };
 
       this.recognition.onresult = (event) => {
         if (this.isDestroyed) return;
         
         const results = Array.from(event.results);
-        const latestResult = results[results.length - 1];
         
-        if (latestResult) {
-          const transcript = latestResult[0].transcript.toLowerCase().trim();
-          console.log('🎧 Wake word listener heard:', transcript);
-          
-          // Check if any wake word is detected
-          const wakeWordDetected = this.wakeWords.some(word => 
-            transcript.includes(word)
-          );
-          
-          if (wakeWordDetected) {
-            console.log('✅ Wake word "Astrova" detected!');
-            // Stop wake word detection temporarily when wake word is detected
-            this.stop();
-            this.onWakeWordDetected();
+        // Process all results, focusing on the most recent
+        for (let i = results.length - 1; i >= 0; i--) {
+          const result = results[i];
+          if (result && result[0]) {
+            const transcript = result[0].transcript.toLowerCase().trim();
+            console.log(`🎧 Wake word listener heard: "${transcript}" (confidence: ${result[0].confidence?.toFixed(2) || 'N/A'})`);
+            
+            // Check if any wake word is detected with better matching
+            const wakeWordDetected = this.wakeWords.some(word => {
+              const cleanTranscript = transcript.replace(/[^\w\s]/g, '').toLowerCase();
+              const cleanWord = word.toLowerCase();
+              return cleanTranscript.includes(cleanWord) || 
+                     this.levenshteinDistance(cleanTranscript, cleanWord) <= 2;
+            });
+            
+            if (wakeWordDetected) {
+              console.log(`✅ Wake word detected in: "${transcript}"`);
+              this.stop();
+              this.onWakeWordDetected();
+              return;
+            }
           }
         }
       };
@@ -83,19 +105,25 @@ export class WakeWordDetector {
         
         console.log('Wake word detection error:', event.error);
         
-        // Only handle specific errors, ignore "aborted" when it's intentional
+        // Handle specific errors differently
         if (event.error === 'aborted') {
           console.log('Wake word detection aborted (likely intentional)');
           return;
         }
         
         if (event.error === 'not-allowed') {
+          this.consecutiveErrors++;
           this.onError('Microphone permission denied for wake word detection');
           return;
         }
         
-        // For other errors, just log them but don't restart immediately
-        console.log(`Wake word error: ${event.error}, will retry in 3 seconds`);
+        if (event.error === 'network') {
+          this.consecutiveErrors++;
+          console.log('Wake word network error, will retry');
+        } else {
+          this.consecutiveErrors++;
+          console.log(`Wake word error: ${event.error}, consecutive errors: ${this.consecutiveErrors}`);
+        }
       };
 
       this.recognition.onend = () => {
@@ -104,14 +132,9 @@ export class WakeWordDetector {
         this.isListening = false;
         console.log('🔇 Wake word detection ended');
         
-        // Auto-restart wake word detection after a delay if not destroyed
-        if (!this.isDestroyed) {
-          this.restartTimeout = window.setTimeout(() => {
-            if (!this.isDestroyed) {
-              console.log('🔄 Restarting wake word detection...');
-              this.start();
-            }
-          }, 3000); // 3 second delay to prevent rapid restarts
+        // Only auto-restart if not too many errors and not destroyed
+        if (!this.isDestroyed && this.consecutiveErrors < this.maxConsecutiveErrors) {
+          this.scheduleRestart();
         }
       };
 
@@ -119,10 +142,53 @@ export class WakeWordDetector {
       return true;
     } catch (error) {
       if (this.isDestroyed) return false;
+      this.consecutiveErrors++;
       console.error('Failed to start wake word detection:', error);
       this.onError(`Failed to start wake word detection: ${error}`);
       return false;
     }
+  }
+
+  private scheduleRestart() {
+    if (this.isDestroyed || this.isRestarting) return;
+    
+    this.isRestarting = true;
+    const delay = Math.min(3000 + (this.consecutiveErrors * 2000), 10000); // Exponential backoff, max 10s
+    
+    this.restartTimeout = window.setTimeout(() => {
+      if (!this.isDestroyed) {
+        console.log(`🔄 Restarting wake word detection... (attempt after ${this.consecutiveErrors} errors)`);
+        this.start();
+      }
+    }, delay);
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
   }
 
   stop() {
@@ -133,6 +199,8 @@ export class WakeWordDetector {
       window.clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
     }
+
+    this.isRestarting = false;
 
     if (this.recognition) {
       try {
@@ -148,6 +216,7 @@ export class WakeWordDetector {
   destroy() {
     console.log('💥 Destroying wake word detector');
     this.isDestroyed = true;
+    this.consecutiveErrors = 0;
     this.stop();
   }
 
@@ -159,10 +228,20 @@ export class WakeWordDetector {
   restart() {
     if (this.isDestroyed) return;
     console.log('🔄 Restarting wake word detection after push-to-talk');
+    
+    // Reset error count when manually restarting
+    this.consecutiveErrors = 0;
+    
     this.restartTimeout = window.setTimeout(() => {
       if (!this.isDestroyed) {
         this.start();
       }
     }, 1000); // 1 second delay
+  }
+
+  // Method to reset error count (useful for manual recovery)
+  resetErrorCount() {
+    this.consecutiveErrors = 0;
+    console.log('🔄 Reset wake word error count');
   }
 }
