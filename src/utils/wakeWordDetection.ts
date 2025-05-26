@@ -1,3 +1,4 @@
+
 export class WakeWordDetector {
   private recognition: SpeechRecognition | null = null;
   private isListening = false;
@@ -5,7 +6,7 @@ export class WakeWordDetector {
   private onError: (error: string) => void;
   private wakeWords = ['astrova', 'astrava', 'astrova ai'];
   private isDestroyed = false;
-  private restartTimeout: ReturnType<typeof setTimeout> | null = null;
+  private restartTimeout: number | null = null;
 
   constructor(
     onWakeWordDetected: () => void,
@@ -28,7 +29,7 @@ export class WakeWordDetector {
 
     // Clear any existing restart timeout
     if (this.restartTimeout) {
-      clearTimeout(this.restartTimeout);
+      window.clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
     }
 
@@ -105,7 +106,7 @@ export class WakeWordDetector {
         
         // Auto-restart wake word detection after a delay if not destroyed
         if (!this.isDestroyed) {
-          this.restartTimeout = setTimeout(() => {
+          this.restartTimeout = window.setTimeout(() => {
             if (!this.isDestroyed) {
               console.log('🔄 Restarting wake word detection...');
               this.start();
@@ -129,7 +130,7 @@ export class WakeWordDetector {
     
     // Clear restart timeout
     if (this.restartTimeout) {
-      clearTimeout(this.restartTimeout);
+      window.clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
     }
 
@@ -158,7 +159,7 @@ export class WakeWordDetector {
   restart() {
     if (this.isDestroyed) return;
     console.log('🔄 Restarting wake word detection after push-to-talk');
-    setTimeout(() => {
+    this.restartTimeout = window.setTimeout(() => {
       if (!this.isDestroyed) {
         this.start();
       }
