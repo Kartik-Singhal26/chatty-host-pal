@@ -90,6 +90,39 @@ export type Database = {
         }
         Relationships: []
       }
+      escalation_rules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          escalation_type: string
+          id: string
+          priority_level: number
+          response_template: string
+          trigger_keywords: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          escalation_type?: string
+          id?: string
+          priority_level?: number
+          response_template: string
+          trigger_keywords: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          escalation_type?: string
+          id?: string
+          priority_level?: number
+          response_template?: string
+          trigger_keywords?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hotel_information: {
         Row: {
           base_price: number | null
@@ -162,6 +195,39 @@ export type Database = {
           response_template?: string | null
           updated_at?: string
           usage_count?: number | null
+        }
+        Relationships: []
+      }
+      training_dialogues: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          expected_response: string
+          id: string
+          scenario_type: string
+          updated_at: string
+          user_message: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          expected_response: string
+          id?: string
+          scenario_type?: string
+          updated_at?: string
+          user_message: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          expected_response?: string
+          id?: string
+          scenario_type?: string
+          updated_at?: string
+          user_message?: string
         }
         Relationships: []
       }

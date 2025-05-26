@@ -27,6 +27,7 @@ interface TrainingDialogue {
   expected_response: string;
   scenario_type: string;
   created_at: string;
+  created_by?: string;
 }
 
 interface EscalationRule {
@@ -35,6 +36,8 @@ interface EscalationRule {
   escalation_type: string;
   response_template: string;
   priority_level: number;
+  created_by?: string;
+  created_at: string;
 }
 
 const AdminTraining = () => {
@@ -111,7 +114,10 @@ const AdminTraining = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (dialogueError) throw dialogueError;
+      if (dialogueError) {
+        console.error('Error fetching dialogues:', dialogueError);
+        throw dialogueError;
+      }
       setTrainingDialogues(dialogues || []);
 
       // Fetch escalation rules
@@ -120,7 +126,10 @@ const AdminTraining = () => {
         .select('*')
         .order('priority_level', { ascending: false });
 
-      if (rulesError) throw rulesError;
+      if (rulesError) {
+        console.error('Error fetching rules:', rulesError);
+        throw rulesError;
+      }
       setEscalationRules(rules || []);
 
     } catch (error) {
@@ -154,7 +163,10 @@ const AdminTraining = () => {
           created_by: 'admin'
         }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding dialogue:', error);
+        throw error;
+      }
 
       toast({
         title: "Training Dialogue Added",
@@ -201,7 +213,10 @@ const AdminTraining = () => {
           created_by: 'admin'
         }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding escalation rule:', error);
+        throw error;
+      }
 
       toast({
         title: "Escalation Rule Added",
@@ -480,6 +495,39 @@ const AdminTraining = () => {
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   Add Escalation Rule
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* Escalation Rules List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Escalation Rules ({escalationRules.length} rules)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Trigger Keywords</TableHead>
+                        <TableHead>Escalation Type</TableHead>
+                        <TableHead>Response Template</TableHead>
+                        <TableHead>Date Added</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {escalationRules.map((rule) => (
+                        <TableRow key={rule.id}>
+                          <TableCell className="font-medium">{rule.priority_level}</TableCell>
+                          <TableCell>{rule.trigger_keywords.join(', ')}</TableCell>
+                          <TableCell>{rule.escalation_type}</TableCell>
+                          <TableCell className="max-w-xs truncate">{rule.response_template}</TableCell>
+                          <TableCell>{new Date(rule.created_at).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
