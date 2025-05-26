@@ -71,7 +71,7 @@ const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({
     }
 
     return () => {
-      wakeWordDetector.current?.stop();
+      wakeWordDetector.current?.destroy();
     };
   }, [wakeWordEnabled]);
 
@@ -84,49 +84,68 @@ const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({
       recognition.current.onstart = () => {
         setIsListening(true);
         onStartListening();
-        console.log('🎤 Speech recognition started');
+        console.log('🎤 Push-to-talk speech recognition started');
       };
 
       recognition.current.onend = () => {
         setIsListening(false);
         onStopListening();
-        console.log('🔇 Speech recognition ended');
+        console.log('🔇 Push-to-talk speech recognition ended');
+        
+        // Restart wake word detection after push-to-talk ends
+        if (wakeWordDetector.current && wakeWordEnabled) {
+          wakeWordDetector.current.restart();
+        }
       };
 
       recognition.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         const confidence = event.results[0][0].confidence;
         
-        console.log(`📝 Transcript: "${transcript}" (Confidence: ${confidence?.toFixed(2) || 'N/A'})`);
+        console.log(`📝 Push-to-talk transcript: "${transcript}" (Confidence: ${confidence?.toFixed(2) || 'N/A'})`);
         onTranscript(transcript);
       };
 
       recognition.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('Push-to-talk speech recognition error:', event.error);
         setIsListening(false);
         onStopListening();
         
-        const errorMessages = {
-          'network': 'Network error - Please check connection',
-          'not-allowed': 'Microphone permission required',
-          'no-speech': 'No speech detected',
-          'audio-capture': 'Audio capture error',
-          'service-not-allowed': 'Speech service not available'
-        };
+        // Only show error for non-aborted errors
+        if (event.error !== 'aborted') {
+          const errorMessages = {
+            'network': 'Network error - Please check connection',
+            'not-allowed': 'Microphone permission required',
+            'no-speech': 'No speech detected',
+            'audio-capture': 'Audio capture error',
+            'service-not-allowed': 'Speech service not available'
+          };
+          
+          const errorMessage = errorMessages[event.error as keyof typeof errorMessages] || 
+                             `Voice error: ${event.error}`;
+          
+          toast({
+            title: "Voice Recognition Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        }
         
-        const errorMessage = errorMessages[event.error as keyof typeof errorMessages] || 
-                           `Voice error: ${event.error}`;
-        
-        toast({
-          title: "Voice Recognition Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
+        // Restart wake word detection after error
+        if (wakeWordDetector.current && wakeWordEnabled) {
+          wakeWordDetector.current.restart();
+        }
       };
     }
-  }, [language, onTranscript, onStartListening, onStopListening, toast]);
+  }, [language, onTranscript, onStartListening, onStopListening, toast, wakeWordEnabled]);
 
   const startListening = async () => {
+    // Stop wake word detection when starting push-to-talk
+    if (wakeWordDetector.current) {
+      wakeWordDetector.current.stop();
+      setWakeWordActive(false);
+    }
+
     if (!recognition.current) {
       await initializeSpeechRecognition();
     }
@@ -135,12 +154,18 @@ const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({
       try {
         recognition.current.start();
       } catch (error) {
-        console.error('Error starting recognition:', error);
+        console.error('Error starting push-to-talk recognition:', error);
         toast({
           title: "Microphone Error",
           description: "Please allow microphone access",
           variant: "destructive",
         });
+        
+        // Restart wake word detection if push-to-talk fails
+        if (wakeWordDetector.current && wakeWordEnabled) {
+          wakeWordDetector.current.restart();
+          setWakeWordActive(true);
+        }
       }
     }
   };
@@ -167,6 +192,24 @@ const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({
     }
     onStopSpeaking();
   };
+
+  // Restart wake word detection when component becomes idle
+  useEffect(() => {
+    if (!isListening && !isProcessing && !isSpeaking && wakeWordEnabled && !wakeWordActive) {
+      const timer = setTimeout(() => {
+        if (wakeWordDetector.current && !isListening && !isProcessing && !isSpeaking) {
+          wakeWordDetector.current.start().then(success => {
+            if (success) {
+              setWakeWordActive(true);
+              console.log('🎤 Wake word detection reactivated');
+            }
+          });
+        }
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isListening, isProcessing, isSpeaking, wakeWordEnabled, wakeWordActive]);
 
   return (
     <Card className="border-0 bg-gray-50">
