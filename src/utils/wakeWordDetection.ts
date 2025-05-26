@@ -1,4 +1,3 @@
-
 export class WakeWordDetector {
   private recognition: SpeechRecognition | null = null;
   private isListening = false;
@@ -6,7 +5,7 @@ export class WakeWordDetector {
   private onError: (error: string) => void;
   private wakeWords = ['astrova', 'astrava', 'astrova ai'];
   private isDestroyed = false;
-  private restartTimeout: number | null = null;
+  private restartTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     onWakeWordDetected: () => void,
