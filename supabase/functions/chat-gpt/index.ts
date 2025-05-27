@@ -71,14 +71,14 @@ serve(async (req) => {
       dbService.updateSession(sessionId)
     ]).catch(error => console.error('Background tasks error:', error));
 
-    console.log('Response generated in', responseTime, 'ms with GPT-4 using conversation memory');
+    console.log('Response generated in', responseTime, 'ms with GPT-4o-mini using conversation memory');
 
     return new Response(JSON.stringify({ 
       response: assistantResponse,
       sessionId: sessionId,
       knowledgeUsed: relevantKnowledge.length,
       conversationLength: conversationHistory.length + 2, // +2 for current user and assistant messages
-      model: 'gpt-4'
+      model: 'gpt-4o-mini'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

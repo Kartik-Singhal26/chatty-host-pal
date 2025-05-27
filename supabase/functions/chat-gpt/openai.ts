@@ -28,7 +28,7 @@ export class OpenAIService {
       // Add current user input
       messages.push({ role: 'user', content: userInput });
 
-      console.log('Sending request to GPT-4 with', messages.length, 'messages');
+      console.log('Sending request to GPT-4o-mini with', messages.length, 'messages');
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -37,7 +37,7 @@ export class OpenAIService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4', // Changed from gpt-4o-mini to gpt-4
+          model: 'gpt-4o-mini', // Changed from gpt-4 to gpt-4o-mini
           messages: messages,
           max_tokens: 1000,
           temperature: 0.7,
